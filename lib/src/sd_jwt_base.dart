@@ -18,7 +18,8 @@ class SdJwt extends Jwt {
   SaltAlgorithm? _saltAlgorithm;
   final DigestAlgorithm _digestAlgorithm;
   Map<String, dynamic> _alwaysDisclosed = {};
-  // int decoyLevel = 0;
+  DecoyFactor decoyFactor;
+  int _decoyMaxCount = 0;
 
   set alwaysDisclosed(Map<String, dynamic> value) {
     _alwaysDisclosed = value;
@@ -29,8 +30,8 @@ class SdJwt extends Jwt {
 
   @override
   Map<String, dynamic> get payload {
-    Map<String, dynamic> map =
-        _undisclosePayloadMap(_mergePayloadMap(_disclosures, _alwaysDisclosed));
+    Map<String, dynamic> map = _decoyDigestsMap(_undisclosePayloadMap(
+        _mergePayloadMap(_disclosures, _alwaysDisclosed)));
     issuer != null ? map['iss'] = issuer : null;
     subject != null ? map['sub'] = subject : null;
     audience != null ? map['aud'] = audience : null;
@@ -49,22 +50,21 @@ class SdJwt extends Jwt {
     return map;
   }
 
-  SdJwt(
-      {required super.claims,
-      Map<String, dynamic>? alwaysDisclosed,
-      SaltAlgorithm saltAlgorithm = SaltAlgorithm.randomBase64UrlNoPadding256,
-      DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha256,
-      super.issuer,
-      super.subject,
-      super.audience,
-      super.expirationTime,
-      super.notBefore,
-      super.issuedAt,
-      super.jwtId,
-      super.header,
-      // this.decoyLevel = 0,
-      })
-      : _saltAlgorithm = saltAlgorithm,
+  SdJwt({
+    required super.claims,
+    Map<String, dynamic>? alwaysDisclosed,
+    SaltAlgorithm saltAlgorithm = SaltAlgorithm.randomBase64UrlNoPadding256,
+    DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha256,
+    super.issuer,
+    super.subject,
+    super.audience,
+    super.expirationTime,
+    super.notBefore,
+    super.issuedAt,
+    super.jwtId,
+    super.header,
+    this.decoyFactor = DecoyFactor.none,
+  })  : _saltAlgorithm = saltAlgorithm,
         _digestAlgorithm = digestAlgorithm {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
@@ -76,6 +76,7 @@ class SdJwt extends Jwt {
   SdJwt.verified(SdJws sdJws, Jwk jsonWebKey)
       : _digestAlgorithm = DigestAlgorithm.values
             .singleWhere((e) => e.name == sdJws.payload['_sd_alg']),
+        decoyFactor = DecoyFactor.none,
         super.verified(sdJws, jsonWebKey) {
     claims.remove('_sd_alg');
 
@@ -90,6 +91,7 @@ class SdJwt extends Jwt {
   SdJwt.fromJson(Map<String, dynamic> map)
       : _digestAlgorithm = DigestAlgorithm.values
             .singleWhere((e) => e.name == map['payload']['_sd_alg']),
+        decoyFactor = DecoyFactor.none,
         super.fromJson(map) {
     if (map['disclosures'] != null) {
       List<Disclosure> disclosuresList = (map['disclosures'] as List)
@@ -119,7 +121,6 @@ class SdJwt extends Jwt {
       SigningAlgorithm? signingAlgorithm}) {
     List<Disclosure> disclosuresList = [];
     _getDisclosuresMap(_disclosures, disclosuresList);
-    _alwaysDisclosed['_sd_alg'] = _digestAlgorithm.name;
     Jws jws =
         super.sign(jsonWebKey: jsonWebKey, signingAlgorithm: signingAlgorithm);
     return SdJws(
@@ -155,6 +156,55 @@ class SdJwt extends Jwt {
     });
 
     return copy;
+  }
+
+  _decoyDigestsMap(Map<String, dynamic> map) {
+    for (MapEntry entry in map.entries) {
+      if (entry.key == '_sd' && decoyFactor.value > 0) {
+        final Random random = Random.secure();
+        List<String> digests = entry.value as List<String>;
+        int numberOfDecoys =
+            (_decoyMaxCount * decoyFactor.value - digests.length).round();
+        for (var i = 0; i < numberOfDecoys; i++) {
+          digests.add(removePaddingFromBase64(base64Url.encode(
+              Uint8List.fromList(
+                  List.generate(32, (_) => random.nextInt(256))))));
+        }
+      } else if (entry.value is Map) {
+        map[entry.key] = _decoyDigestsMap(entry.value);
+      } else if (entry.value is List) {
+        map[entry.key] = _decoyDigestsList(entry.value);
+      }
+    }
+    return map;
+  }
+
+  _decoyDigestsList(List<dynamic> list) {
+    int disclosuresCount = 0;
+    for (dynamic entry in list) {
+      if (entry is Map<String, dynamic>) {
+        if (entry.containsKey('...')) {
+          disclosuresCount++;
+        } else {
+          entry = _decoyDigestsMap(entry);
+        }
+      } else if (entry is List) {
+        entry = _decoyDigestsList(entry);
+      }
+    }
+
+    if (disclosuresCount > 0) {
+      final Random random = Random.secure();
+      int numberOfDecoys =
+          (_decoyMaxCount * decoyFactor.value - disclosuresCount).round();
+      for (var i = 0; i < numberOfDecoys; i++) {
+        list.add({
+          '...': removePaddingFromBase64(base64Url.encode(Uint8List.fromList(
+              List.generate(32, (_) => random.nextInt(256)))))
+        });
+      }
+    }
+    return list;
   }
 
   _restoreClaimsMap(Map<String, dynamic> map) {
@@ -282,6 +332,8 @@ class SdJwt extends Jwt {
     map = Map<String, dynamic>.of(map);
     List<String> digests = [];
     List<String> deletions = [];
+    int decoyCount = 0;
+
     for (MapEntry entry in map.entries) {
       if (entry.value is Map) {
         map[entry.key] = _undisclosePayloadMap(entry.value);
@@ -293,6 +345,7 @@ class SdJwt extends Jwt {
         digests.add(removePaddingFromBase64(base64Url
             .encode((entry.value as Disclosure).digest(_digestAlgorithm))));
         deletions.add(entry.key);
+        decoyCount++;
       } else if (entry.value is num) {
         continue;
       } else {
@@ -300,17 +353,11 @@ class SdJwt extends Jwt {
       }
     }
 
-    if (digests.isNotEmpty) {
-      // if (decoyLevel > 0) {
-      //   final Random random = Random.secure();
-      //   int numberOfDecoys = (digests.length * decoyLevel / 100 + digests.length).round();
-      //   for (var i = 0; i < numberOfDecoys; i++) {
-      //     digests.add(base64Url.encode(Uint8List.fromList(List.generate(32, (_) => random.nextInt(256)))));
-      //   }
-      //   print(numberOfDecoys);
-      // }
+    if (decoyCount > _decoyMaxCount) {
+      _decoyMaxCount = decoyCount;
+    }
 
-      print(digests);
+    if (digests.isNotEmpty) {
       map['_sd'] = digests;
     }
 
@@ -323,6 +370,8 @@ class SdJwt extends Jwt {
 
   List<dynamic> _undisclosePayloadList(List<dynamic> list) {
     list = List<dynamic>.of(list);
+    int decoyCount = 0;
+
     for (dynamic entry in list) {
       if (entry is Map<String, dynamic>) {
         list[list.indexOf(entry)] = _undisclosePayloadMap(entry);
@@ -335,12 +384,18 @@ class SdJwt extends Jwt {
           '...': removePaddingFromBase64(
               base64Url.encode((entry).digest(_digestAlgorithm)))
         };
+        decoyCount++;
       } else if (entry is num) {
         continue;
       } else {
         throw Exception();
       }
     }
+
+    if (decoyCount > _decoyMaxCount) {
+      _decoyMaxCount = decoyCount;
+    }
+
     return list;
   }
 
@@ -568,7 +623,6 @@ class Jwt {
     Uint8List signingInput = RFC7515.signingInput(
         payload: jsonWebSignature.payload,
         protectedHeader: jsonWebSignature.header.protected);
-    print(claims);
 
     if (jsonWebKey.keyType == KeyType.ec) {
       PointyCastleCryptoProvider pointyCastleCryptoProvider =
@@ -621,8 +675,10 @@ class Jwt {
           additionalProtected: null);
     }
 
+    Map<String, dynamic> signedPayload = Map.of(payload);
+
     Uint8List signingInput = RFC7515.signingInput(
-        protectedHeader: jwsHeader.protected, payload: payload);
+        protectedHeader: jwsHeader.protected, payload: signedPayload);
 
     if (jsonWebKey.keyType == KeyType.ec) {
       PointyCastleCryptoProvider pointyCastleCryptoProvider =
@@ -642,7 +698,7 @@ class Jwt {
           algorithm: signingAlgorithm);
 
       return Jws(
-        payload: payload,
+        payload: signedPayload,
         signature: signature,
         header: jwsHeader,
       );
@@ -672,7 +728,7 @@ class Jwt {
     if (expirationTime == null && claims['exp'] != null) {
       expirationTime = claims['exp'];
     }
-    if (notBefore == null && payload['nbf'] != null) {
+    if (notBefore == null && claims['nbf'] != null) {
       notBefore = claims['nbf'];
     }
     if (issuedAt == null && claims['iat'] != null) {
@@ -779,6 +835,52 @@ class JwkConfirmation implements Confirmation {
 
   @override
   String toString() => toJson().toString();
+}
+
+enum DecoyFactor {
+  none,
+  tenth,
+  fifth,
+  quarter,
+  third,
+  half,
+  single,
+  double,
+  triple,
+  quadruple,
+  quintuple,
+  tenfold,
+}
+
+extension DecoyFactorValues on DecoyFactor {
+  double get value {
+    switch (this) {
+      case DecoyFactor.none:
+        return 0;
+      case DecoyFactor.tenth:
+        return 0.1;
+      case DecoyFactor.fifth:
+        return 0.20;
+      case DecoyFactor.quarter:
+        return 0.25;
+      case DecoyFactor.third:
+        return 0.33;
+      case DecoyFactor.half:
+        return 0.5;
+      case DecoyFactor.single:
+        return 1;
+      case DecoyFactor.double:
+        return 2;
+      case DecoyFactor.triple:
+        return 3;
+      case DecoyFactor.quadruple:
+        return 4;
+      case DecoyFactor.quintuple:
+        return 5;
+      case DecoyFactor.tenfold:
+        return 10;
+    }
+  }
 }
 
 enum SaltAlgorithm {
