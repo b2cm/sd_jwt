@@ -54,7 +54,7 @@ class SdJwt extends Jwt {
     required super.claims,
     Map<String, dynamic>? alwaysDisclosed,
     SaltAlgorithm saltAlgorithm = SaltAlgorithm.randomBase64UrlNoPadding256,
-    DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha256,
+    DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha2_256,
     super.issuer,
     super.subject,
     super.audience,
@@ -799,7 +799,7 @@ class Disclosure {
       this.value,
       String? salt,
       SaltAlgorithm? saltAlgorithm,
-      DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha256})
+      DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha2_256})
       : salt = salt ??= SaltValue(
                 saltAlgorithm ?? SaltAlgorithm.randomBase64UrlNoPadding256)
             .value;

@@ -30,16 +30,16 @@ enum SigningAlgorithm {
   ecdsaSha512Prime,
 }
 
-enum DigestAlgorithm { sha256, sha384, sha512, sha3_256 }
+enum DigestAlgorithm { sha2_256, sha2_384, sha2_512, sha3_256 }
 
 extension SdAlgorithmName on DigestAlgorithm {
   String get name {
     switch (this) {
-      case DigestAlgorithm.sha256:
+      case DigestAlgorithm.sha2_256:
         return 'sha-256';
-      case DigestAlgorithm.sha384:
+      case DigestAlgorithm.sha2_384:
         return 'sha-384';
-      case DigestAlgorithm.sha512:
+      case DigestAlgorithm.sha2_512:
         return 'sha-512';
       case DigestAlgorithm.sha3_256:
         return 'sha3-256';

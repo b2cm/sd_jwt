@@ -149,11 +149,11 @@ class PointyCastleCryptoProvider implements CryptoProvider {
       {required Uint8List data, required DigestAlgorithm algorithm}) {
     pointy_castle.Digest digest;
     switch (algorithm) {
-      case DigestAlgorithm.sha256:
+      case DigestAlgorithm.sha2_256:
         digest = pointy_castle.SHA256Digest();
-      case DigestAlgorithm.sha384:
+      case DigestAlgorithm.sha2_384:
         digest = pointy_castle.SHA384Digest();
-      case DigestAlgorithm.sha512:
+      case DigestAlgorithm.sha2_512:
         digest = pointy_castle.SHA512Digest();
       case DigestAlgorithm.sha3_256:
         digest = pointy_castle.SHA3Digest(256);
