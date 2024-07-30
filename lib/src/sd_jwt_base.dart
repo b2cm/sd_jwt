@@ -100,7 +100,8 @@ class SdJwt extends Jwt {
               : throw Exception('${e.runtimeType} not supported.'))
           .toList();
       _disclosures = _deepCopyMap(claims);
-      _disclosures = _restoreDisclosuresMap(_disclosures, disclosuresList);
+      _disclosures =
+          _restoreDisclosuresMap(_disclosures, Disclosures(disclosuresList));
       claims = _deepCopyMap(_disclosures);
       claims = _restoreClaimsMap(claims);
     }
@@ -128,7 +129,7 @@ class SdJwt extends Jwt {
       signature: jws.signature,
       protected: jws.protected,
       header: jws.header,
-      disclosures: disclosuresList,
+      disclosures: Disclosures(disclosuresList),
       digestAlgorithm: _digestAlgorithm,
     );
   }
@@ -246,16 +247,25 @@ class SdJwt extends Jwt {
     return list;
   }
 
-  _restoreDisclosuresMap(
-      Map<String, dynamic> map, List<Disclosure> disclosures) {
+  Uint8List _digest(Uint8List digestInput) {
+    PointyCastleCryptoProvider pointyCastleCryptoProvider =
+        PointyCastleCryptoProvider();
+    return pointyCastleCryptoProvider.digest(
+        data: ascii
+            .encode(removePaddingFromBase64(base64Url.encode(digestInput))),
+        algorithm: _digestAlgorithm);
+  }
+
+  _restoreDisclosuresMap(Map<String, dynamic> map, Disclosures disclosures) {
     Map<String, dynamic> tmp = {};
 
     for (MapEntry entry in map.entries) {
       if (entry.key == '_sd') {
-        for (Disclosure disclosure in disclosures) {
-          if ((entry.value as List).contains(removePaddingFromBase64(
-              base64Url.encode(disclosure.digest(_digestAlgorithm))))) {
-            tmp[disclosure.key!] = disclosure;
+        for (Uint8List disclosure in disclosures.origin) {
+          if ((entry.value as List).contains(
+              removePaddingFromBase64(base64Url.encode(_digest(disclosure))))) {
+            Disclosure disclosureObject = Disclosure.fromBytes(disclosure);
+            tmp[disclosureObject.key!] = disclosureObject;
           }
         }
       } else if (entry.value is Map) {
@@ -275,18 +285,18 @@ class SdJwt extends Jwt {
     return map;
   }
 
-  _restoreDisclosuresList(List<dynamic> list, List<Disclosure> disclosures) {
+  _restoreDisclosuresList(List<dynamic> list, Disclosures disclosures) {
     List removals = [];
     for (dynamic entry in list) {
       if (entry is Map<String, dynamic>) {
         if (entry.containsKey('...')) {
           bool found = false;
-
-          for (Disclosure disclosure in disclosures) {
+          for (Uint8List disclosure in disclosures.origin) {
             if (entry['...'] ==
                 removePaddingFromBase64(
-                    base64Url.encode(disclosure.digest(_digestAlgorithm)))) {
-              list[list.indexOf(entry)] = disclosure;
+                    base64Url.encode(_digest(disclosure)))) {
+              Disclosure disclosureObject = Disclosure.fromBytes(disclosure);
+              list[list.indexOf(entry)] = disclosureObject;
               found = true;
             }
           }
@@ -596,7 +606,7 @@ class Jwt {
   }
 
   Jwt(
-      {required this.claims,
+      {required Map<String, dynamic> claims,
       this.issuer,
       this.subject,
       this.audience,
@@ -605,13 +615,13 @@ class Jwt {
       this.issuedAt,
       this.jwtId,
       JoseHeader? header})
-      : _header = header ??= JoseHeader() {
+      : _header = header ??= JoseHeader(), claims = Map.of(claims) {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
   }
 
   Jwt.fromJson(Map<String, dynamic> map)
-      : claims = map['payload'],
+      : claims = Map.of(map['payload']),
         _header = JoseHeader.fromJson(map['header']) {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
@@ -774,6 +784,390 @@ class Jwt {
   }
 }
 
+class Disclosures implements List<Disclosure> {
+  List<Uint8List> origin;
+
+  List<Disclosure> get elements =>
+      origin.map((e) => Disclosure.fromBytes(e)).toList();
+
+  Disclosures(List<Disclosure> elements)
+      : length = elements.length,
+        origin = elements.map((e) => e.bytes).toList();
+
+  Disclosures.fromBytes(List<Uint8List> disclosures)
+      : length = disclosures.length,
+        origin = disclosures;
+
+  @override
+  int length;
+
+  @override
+  Disclosure operator [](int index) {
+    return elements.elementAt(index);
+  }
+
+  @override
+  void operator []=(int index, Disclosure value) {
+    origin[index] = value.bytes;
+  }
+
+  @override
+  bool remove(Object? element) {
+    if (element is Disclosure) {
+      Uint8List? toRemove;
+      for (Uint8List disclosure in origin) {
+        Disclosure disclosureObject = Disclosure.fromBytes(disclosure);
+        if (disclosureObject.salt == element.salt &&
+            disclosureObject.key == element.key &&
+            disclosureObject.value == element.value) {
+          toRemove = disclosure;
+        }
+      }
+      if (toRemove != null) {
+        origin.remove(toRemove);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @override
+  Disclosure get first => Disclosure.fromBytes(origin.first);
+
+  @override
+  Disclosure get last => Disclosure.fromBytes(origin.last);
+
+  @override
+  set first(Disclosure value) {
+    origin.first = value.bytes;
+  }
+
+  @override
+  set last(Disclosure value) {
+    origin.last = value.bytes;
+  }
+
+  @override
+  List<Disclosure> operator +(List<Disclosure> other) {
+    origin.addAll(other.map((e) => e.bytes));
+    return origin.map((e) => Disclosure.fromBytes(e)).toList();
+  }
+
+  @override
+  void add(Disclosure value) {
+    origin.add(value.bytes);
+  }
+
+  @override
+  void addAll(Iterable<Disclosure> iterable) {
+    origin.addAll(iterable.map((e) => e.bytes));
+  }
+
+  @override
+  bool any(bool Function(Disclosure element) test) {
+    return origin.map((e) => Disclosure.fromBytes(e)).any(test);
+  }
+
+  @override
+  Map<int, Disclosure> asMap() {
+    return origin.map((e) => Disclosure.fromBytes(e)).toList().asMap();
+  }
+
+  @override
+  List<R> cast<R>() {
+    return origin.map((e) => Disclosure.fromBytes(e)).cast<R>().toList();
+  }
+
+  @override
+  void clear() {
+    origin.clear();
+  }
+
+  @override
+  bool contains(Object? element) {
+    if (element is Disclosure) {
+      for (int i = 0; i < length; i++) {
+        if (this[i].key == element.key &&
+            this[i].value == element.value &&
+            this[i].salt == element.salt) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @override
+  Disclosure elementAt(int index) {
+    return Disclosure.fromBytes(origin.elementAt(index));
+  }
+
+  @override
+  bool every(bool Function(Disclosure element) test) {
+    return origin.map((e) => Disclosure.fromBytes(e)).every(test);
+  }
+
+  @override
+  Iterable<T> expand<T>(Iterable<T> Function(Disclosure element) toElements) {
+    return origin.map((e) => Disclosure.fromBytes(e)).expand(toElements);
+  }
+
+  @override
+  void fillRange(int start, int end, [Disclosure? fillValue]) {
+    origin.fillRange(start, end, fillValue?.bytes);
+  }
+
+  @override
+  Disclosure firstWhere(bool Function(Disclosure element) test,
+      {Disclosure Function()? orElse}) {
+    return origin.map((e) => Disclosure.fromBytes(e)).firstWhere(test);
+  }
+
+  @override
+  T fold<T>(
+      T initialValue, T Function(T previousValue, Disclosure element) combine) {
+    return origin
+        .map((e) => Disclosure.fromBytes(e))
+        .fold(initialValue, combine);
+  }
+
+  @override
+  Iterable<Disclosure> followedBy(Iterable<Disclosure> other) {
+    return origin.map((e) => Disclosure.fromBytes(e)).followedBy(other);
+  }
+
+  @override
+  void forEach(void Function(Disclosure element) action) {
+    for (int i = 0; i < length; i++) {
+      action(this[i]);
+    }
+  }
+
+  @override
+  Iterable<Disclosure> getRange(int start, int end) {
+    return origin
+        .map((e) => Disclosure.fromBytes(e))
+        .toList()
+        .getRange(start, end);
+  }
+
+  @override
+  int indexOf(Disclosure element, [int start = 0]) {
+    for (int i = start; i < length; i++) {
+      if (this[i].key == element.key &&
+          this[i].value == element.value &&
+          this[i].salt == element.salt) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  @override
+  int indexWhere(bool Function(Disclosure element) test, [int start = 0]) {
+    return origin.map((e) => Disclosure.fromBytes(e)).toList().indexWhere(test);
+  }
+
+  @override
+  void insert(int index, Disclosure element) {
+    origin.insert(index, element.bytes);
+  }
+
+  @override
+  void insertAll(int index, Iterable<Disclosure> iterable) {
+    origin.insertAll(index, iterable.map((e) => e.bytes));
+  }
+
+  @override
+  bool get isEmpty => origin.isEmpty;
+
+  @override
+  bool get isNotEmpty => origin.isNotEmpty;
+
+  @override
+  Iterator<Disclosure> get iterator =>
+      origin.map((e) => Disclosure.fromBytes(e)).iterator;
+
+  @override
+  String join([String separator = ""]) {
+    return origin.map((e) => Disclosure.fromBytes(e)).join(separator);
+  }
+
+  @override
+  int lastIndexOf(Disclosure element, [int? start]) {
+    for (Uint8List disclosure in origin) {
+      Disclosure disclosureObject = Disclosure.fromBytes(disclosure);
+      if (disclosureObject.key == element.key &&
+          disclosureObject.value == element.value &&
+          disclosureObject.salt == element.salt) {
+        return origin.lastIndexOf(disclosure);
+      }
+    }
+    return -1;
+  }
+
+  @override
+  int lastIndexWhere(bool Function(Disclosure element) test, [int? start]) {
+    return origin
+        .map((e) => Disclosure.fromBytes(e))
+        .toList()
+        .lastIndexWhere(test);
+  }
+
+  @override
+  Disclosure lastWhere(bool Function(Disclosure element) test,
+      {Disclosure Function()? orElse}) {
+    return origin.map((e) => Disclosure.fromBytes(e)).lastWhere(test);
+  }
+
+  @override
+  Iterable<T> map<T>(T Function(Disclosure e) toElement) {
+    return origin.map((e) => Disclosure.fromBytes(e)).map(toElement);
+  }
+
+  @override
+  Disclosure reduce(
+      Disclosure Function(Disclosure value, Disclosure element) combine) {
+    return origin.map((e) => Disclosure.fromBytes(e)).reduce(combine);
+  }
+
+  @override
+  Disclosure removeAt(int index) {
+    return Disclosure.fromBytes(origin.removeAt(index));
+  }
+
+  @override
+  Disclosure removeLast() {
+    return Disclosure.fromBytes(origin.removeLast());
+  }
+
+  @override
+  void removeRange(int start, int end) {
+    origin.removeRange(start, end);
+  }
+
+  @override
+  void removeWhere(bool Function(Disclosure element) test) {
+    for (int i = 0; i < length; i++) {
+      if (test(this[i])) {
+        origin.removeAt(i);
+      }
+    }
+  }
+
+  @override
+  void replaceRange(int start, int end, Iterable<Disclosure> replacements) {
+    origin.replaceRange(start, end, replacements.map((e) => e.bytes));
+  }
+
+  @override
+  void retainWhere(bool Function(Disclosure element) test) {
+    _filter(test, true);
+  }
+
+  void _filter(bool Function(Disclosure element) test, bool retainMatching) {
+    List<Disclosure> retained = <Disclosure>[];
+    int length = this.length;
+    for (int i = 0; i < length; i++) {
+      var element = this[i];
+      if (test(element) == retainMatching) {
+        retained.add(element);
+      }
+      if (length != this.length) {
+        throw ConcurrentModificationError(this);
+      }
+    }
+    if (retained.length != this.length) {
+      setRange(0, retained.length, retained);
+      this.length = retained.length;
+    }
+  }
+
+  @override
+  Iterable<Disclosure> get reversed =>
+      origin.map((e) => Disclosure.fromBytes(e)).toList().reversed;
+
+  @override
+  void setAll(int index, Iterable<Disclosure> iterable) {
+    origin.setAll(index, iterable.map((e) => e.bytes));
+  }
+
+  @override
+  void setRange(int start, int end, Iterable<Disclosure> iterable,
+      [int skipCount = 0]) {
+    origin.setRange(start, end, iterable.map((e) => e.bytes), skipCount);
+  }
+
+  @override
+  void shuffle([Random? random]) {
+    origin.shuffle(random);
+  }
+
+  @override
+  Disclosure get single => origin.map((e) => Disclosure.fromBytes(e)).single;
+
+  @override
+  Disclosure singleWhere(bool Function(Disclosure element) test,
+      {Disclosure Function()? orElse}) {
+    return origin.map((e) => Disclosure.fromBytes(e)).singleWhere(test);
+  }
+
+  @override
+  Iterable<Disclosure> skip(int count) {
+    return origin.map((e) => Disclosure.fromBytes(e)).skip(count);
+  }
+
+  @override
+  Iterable<Disclosure> skipWhile(bool Function(Disclosure value) test) {
+    return origin.map((e) => Disclosure.fromBytes(e)).skipWhile(test);
+  }
+
+  @override
+  void sort([int Function(Disclosure a, Disclosure b)? compare]) {
+    throw UnimplementedError();
+  }
+
+  @override
+  List<Disclosure> sublist(int start, [int? end]) {
+    return origin
+        .map((e) => Disclosure.fromBytes(e))
+        .toList()
+        .sublist(start, end);
+  }
+
+  @override
+  Iterable<Disclosure> take(int count) {
+    return origin.map((e) => Disclosure.fromBytes(e)).toList().take(count);
+  }
+
+  @override
+  Iterable<Disclosure> takeWhile(bool Function(Disclosure value) test) {
+    return origin.map((e) => Disclosure.fromBytes(e)).takeWhile(test);
+  }
+
+  @override
+  List<Disclosure> toList({bool growable = true}) {
+    return origin
+        .map((e) => Disclosure.fromBytes(e))
+        .toList(growable: growable);
+  }
+
+  @override
+  Set<Disclosure> toSet() {
+    return origin.map((e) => Disclosure.fromBytes(e)).toSet();
+  }
+
+  @override
+  Iterable<Disclosure> where(bool Function(Disclosure element) test) {
+    return origin.map((e) => Disclosure.fromBytes(e)).where(test);
+  }
+
+  @override
+  Iterable<T> whereType<T>() {
+    throw UnimplementedError();
+  }
+}
+
 class Disclosure {
   String salt;
   String? key;
@@ -790,16 +1184,11 @@ class Disclosure {
   }
 
   Uint8List digest(DigestAlgorithm digestAlgorithm) {
-    List digestInputList;
-    key != null
-        ? digestInputList = [salt, key, value]
-        : digestInputList = [salt, value];
-    Uint8List digestInput = ascii.encode(base64Url.encode(
-        utf8.encode(json.encode(digestInputList).replaceAll(',', ', '))));
     PointyCastleCryptoProvider pointyCastleCryptoProvider =
         PointyCastleCryptoProvider();
     return pointyCastleCryptoProvider.digest(
-        data: digestInput, algorithm: digestAlgorithm);
+        data: ascii.encode(removePaddingFromBase64(base64Url.encode(bytes))),
+        algorithm: digestAlgorithm);
   }
 
   Disclosure(
@@ -816,6 +1205,27 @@ class Disclosure {
       : salt = map['salt'],
         key = map['key'],
         value = map['value'];
+
+  factory Disclosure.fromBytes(Uint8List disclosure) {
+    dynamic decoded = json.decode(utf8.decode(disclosure));
+    if (decoded is List) {
+      if (decoded.length == 2) {
+        return Disclosure(
+          salt: decoded[0],
+          value: decoded[1],
+        );
+      } else if (decoded.length == 3) {
+        return Disclosure(
+          salt: decoded[0],
+          key: decoded[1],
+          value: decoded[2],
+        );
+      } else {
+        throw Exception('Invalid disclosure.');
+      }
+    }
+    throw Exception('Invalid disclosure.');
+  }
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> map = {

@@ -3,25 +3,29 @@ import 'dart:typed_data';
 
 import 'package:sd_jwt/sd_jwt.dart';
 import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
+import 'package:sd_jwt/src/sd_jwt_base.dart';
 import 'package:sd_jwt/src/sd_jwt_utils.dart';
 
 class SdJws extends Jws {
-  List<Disclosure>? disclosures;
+  Disclosures? _disclosures;
   KbJws? keyBindingJws;
   DigestAlgorithm _digestAlgorithm;
+
+  Disclosures? get disclosures => _disclosures;
+
 
   SdJws({
     required super.payload,
     required super.signature,
     required super.protected,
     required super.header,
-    this.disclosures,
+    Disclosures? disclosures,
     this.keyBindingJws,
     required DigestAlgorithm digestAlgorithm,
-  }) : _digestAlgorithm = digestAlgorithm;
+  }) : _digestAlgorithm = digestAlgorithm, _disclosures = disclosures;
 
   factory SdJws.fromCompactSerialization(String string) {
-    List<Disclosure> disclosures = [];
+    List<Uint8List> disclosures = [];
     List<String> elements = string.split('~');
 
     String compactJws = elements.first;
@@ -34,14 +38,7 @@ class SdJws extends Jws {
     KbJws? kbJws;
     for (String element in other) {
       if (element.startsWith('Wy')) {
-        List decoded = json
-            .decode(utf8.decode(base64Url.decode(addPaddingToBase64(element))));
-        if (decoded.length == 2) {
-          disclosures.add(Disclosure(salt: decoded[0], value: decoded[1]));
-        } else if (decoded.length == 3) {
-          disclosures.add(
-              Disclosure(salt: decoded[0], key: decoded[1], value: decoded[2]));
-        }
+        disclosures.add(base64Url.decode(addPaddingToBase64(element)));
       } else if (element.startsWith('ey') && element.contains('.')) {
         kbJws = KbJws.fromCompactSerialization(element);
       }
@@ -52,7 +49,7 @@ class SdJws extends Jws {
         signature: jws.signature,
         header: jws.header,
         protected: jws.protected,
-        disclosures: disclosures,
+        disclosures: Disclosures.fromBytes(disclosures),
         keyBindingJws: kbJws,
         digestAlgorithm: digestAlgorithm);
   }
@@ -60,9 +57,9 @@ class SdJws extends Jws {
   @override
   String toCompactSerialization() {
     String compactSerialization = super.toCompactSerialization();
-    disclosures != null
+    _disclosures != null
         ? compactSerialization +=
-            '~${disclosures!.map((e) => removePaddingFromBase64(base64Url.encode(e.bytes))).join('~')}'
+            '~${_disclosures!.origin.map((e) => removePaddingFromBase64(base64Url.encode(e))).join('~')}'
         : null;
     keyBindingJws != null
         ? compactSerialization += '~${keyBindingJws!.toCompactSerialization()}'
@@ -74,8 +71,8 @@ class SdJws extends Jws {
   Map<String, dynamic> toJson() {
     Map<String, dynamic> map = super.toJson();
     map.addAll({
-      'disclosures': disclosures
-          ?.map((e) => removePaddingFromBase64(base64Url.encode(e.bytes)))
+      'disclosures': _disclosures?.origin
+          .map((e) => removePaddingFromBase64(base64Url.encode(e)))
           .toList(),
     });
     if (keyBindingJws != null) {
@@ -90,7 +87,7 @@ class SdJws extends Jws {
   Map<String, dynamic> jsonContent() {
     Map<String, dynamic> map = super.jsonContent();
     map.addAll({
-      'disclosures': disclosures,
+      'disclosures': _disclosures,
     });
     if (keyBindingJws != null) {
       map.addAll({
@@ -117,9 +114,9 @@ class SdJws extends Jws {
 
   Uint8List get digest {
     String compactSerialization = super.toCompactSerialization();
-    disclosures != null
+    _disclosures != null
         ? compactSerialization +=
-            '~${disclosures!.map((e) => removePaddingFromBase64(base64Url.encode(e.bytes))).join('~')}'
+            '~${_disclosures!.origin.map((e) => removePaddingFromBase64(base64Url.encode(e))).join('~')}'
         : null;
     PointyCastleCryptoProvider pointyCastleCryptoProvider =
         PointyCastleCryptoProvider();
