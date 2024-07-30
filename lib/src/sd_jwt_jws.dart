@@ -3,9 +3,6 @@ import 'dart:typed_data';
 
 import 'package:sd_jwt/sd_jwt.dart';
 import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
-import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
-import 'package:sd_jwt/src/sd_jwt_jose.dart';
-import 'package:sd_jwt/src/sd_jwt_jwk.dart';
 import 'package:sd_jwt/src/sd_jwt_utils.dart';
 
 class SdJws extends Jws {
@@ -16,6 +13,7 @@ class SdJws extends Jws {
   SdJws({
     required super.payload,
     required super.signature,
+    required super.protected,
     required super.header,
     this.disclosures,
     this.keyBindingJws,
@@ -31,7 +29,7 @@ class SdJws extends Jws {
 
     Jws jws = Jws.fromCompactSerialization(compactJws);
     DigestAlgorithm digestAlgorithm = DigestAlgorithm.values
-        .singleWhere((e) => e.name == jws.payload['_sd_alg']);
+        .singleWhere((e) => e.name == json.decode(utf8.decode(jws.payload))['_sd_alg']);
 
     KbJws? kbJws;
     for (String element in other) {
@@ -53,6 +51,7 @@ class SdJws extends Jws {
         payload: jws.payload,
         signature: jws.signature,
         header: jws.header,
+        protected: jws.protected,
         disclosures: disclosures,
         keyBindingJws: kbJws,
         digestAlgorithm: digestAlgorithm);
@@ -147,6 +146,7 @@ class SdJws extends Jws {
     return SdJws(
       payload: payload,
       signature: signature,
+      protected: protected,
       header: header,
       disclosures: disclosures,
       keyBindingJws: kbJws,
@@ -156,28 +156,31 @@ class SdJws extends Jws {
 }
 
 class Jws {
-  Map<String, dynamic> payload;
-  JwsJoseHeader header;
+  Uint8List payload;
+  Map<String, dynamic> header;
+  Uint8List protected;
   Uint8List signature;
 
   Jws({
     required this.payload,
     required this.signature,
     required this.header,
+    required this.protected,
   });
 
   factory Jws.fromCompactSerialization(String string) {
-    Map<String, dynamic> protected = json.decode(utf8
-        .decode(base64Url.decode(addPaddingToBase64(string.split('.')[0]))));
-    Map<String, dynamic> payload = json.decode(utf8
-        .decode(base64Url.decode(addPaddingToBase64(string.split('.')[1]))));
+    Uint8List protected =
+        base64Url.decode(addPaddingToBase64(string.split('.')[0]));
+    Uint8List payload =
+        base64Url.decode(addPaddingToBase64(string.split('.')[1]));
     Uint8List signature =
         base64Url.decode(addPaddingToBase64(string.split('.')[2]));
 
     return Jws(
         payload: payload,
         signature: signature,
-        header: JwsJoseHeader.fromJson({'protected': protected}));
+        protected: protected,
+        header: {});
   }
 
 /*  RFC 7515                JSON Web Signature (JWS)                May 2015
@@ -223,12 +226,9 @@ class Jws {
    value.*/
 
   String toCompactSerialization() {
-    String jwsHeader = removePaddingFromBase64(
-        base64Url.encode(utf8.encode(json.encode(header.protected))));
-    String jwsPayload = removePaddingFromBase64(
-        base64Url.encode(utf8.encode(json.encode(payload))));
-    String jwsSignature =
-        removePaddingFromBase64(base64Url.encode(signature.toList()));
+    String jwsHeader = removePaddingFromBase64(base64Url.encode(protected));
+    String jwsPayload = removePaddingFromBase64(base64Url.encode(payload));
+    String jwsSignature = removePaddingFromBase64(base64Url.encode(signature));
 
     return '$jwsHeader.$jwsPayload.$jwsSignature';
   }
@@ -267,19 +267,16 @@ class Jws {
   about the JWS JSON Serialization.*/
 
   Map<String, dynamic> toJson() => {
-        'protected': removePaddingFromBase64(
-            base64Url.encode(utf8.encode(json.encode(header.protected)))),
-        'header': header.unprotected,
-        'payload': removePaddingFromBase64(
-            base64Url.encode(utf8.encode(json.encode(payload)))),
-        'signature':
-            removePaddingFromBase64(base64Url.encode(signature.toList())),
+        'protected': removePaddingFromBase64(base64Url.encode(protected)),
+        'header': header,
+        'payload': removePaddingFromBase64(base64Url.encode(payload)),
+        'signature': removePaddingFromBase64(base64Url.encode(signature)),
       };
 
   Map<String, dynamic> jsonContent() => {
-        'protected': header.protected,
-        'header': header.unprotected,
-        'payload': payload,
+        'protected': json.decode(utf8.decode(protected)),
+        'header': header,
+        'payload': json.decode(utf8.decode(payload)),
         'signature': signature,
       };
 
@@ -305,20 +302,23 @@ class KbJws extends Jws {
     required super.payload,
     required super.signature,
     required super.header,
+    required super.protected,
   });
 
   factory KbJws.fromCompactSerialization(String string) {
-    Map<String, dynamic> protected = json.decode(utf8
-        .decode(base64Url.decode(addPaddingToBase64(string.split('.')[0]))));
-    Map<String, dynamic> payload = json.decode(utf8
-        .decode(base64Url.decode(addPaddingToBase64(string.split('.')[1]))));
+    Uint8List protected =
+        base64Url.decode(addPaddingToBase64(string.split('.')[0]));
+    Uint8List payload =
+        base64Url.decode(addPaddingToBase64(string.split('.')[1]));
     Uint8List signature =
         base64Url.decode(addPaddingToBase64(string.split('.')[2]));
 
     return KbJws(
-        payload: payload,
-        signature: signature,
-        header: JwsJoseHeader.fromJson({'protected': protected}));
+      payload: payload,
+      signature: signature,
+      protected: protected,
+      header: {},
+    );
   }
 
   @override

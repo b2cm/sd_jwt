@@ -74,8 +74,8 @@ class SdJwt extends Jwt {
   }
 
   SdJwt.verified(SdJws sdJws, Jwk jsonWebKey)
-      : _digestAlgorithm = DigestAlgorithm.values
-            .singleWhere((e) => e.name == sdJws.payload['_sd_alg']),
+      : _digestAlgorithm = DigestAlgorithm.values.singleWhere((e) =>
+            e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
         decoyFactor = DecoyFactor.none,
         super.verified(sdJws, jsonWebKey) {
     claims.remove('_sd_alg');
@@ -126,6 +126,7 @@ class SdJwt extends Jwt {
     return SdJws(
       payload: jws.payload,
       signature: jws.signature,
+      protected: jws.protected,
       header: jws.header,
       disclosures: disclosuresList,
       digestAlgorithm: _digestAlgorithm,
@@ -617,18 +618,21 @@ class Jwt {
   }
 
   Jwt.verified(Jws jsonWebSignature, Jwk jsonWebKey)
-      : claims = Map.of(jsonWebSignature.payload),
-        _header = jsonWebSignature.header {
+      : claims = Map.of(json.decode(utf8.decode(jsonWebSignature.payload))),
+        _header = JwsJoseHeader.fromJson({
+          'protected': json.decode(utf8.decode(jsonWebSignature.protected)),
+          'unprotected': jsonWebSignature.header
+        }) {
     Uint8List signature = jsonWebSignature.signature;
-    Uint8List signingInput = RFC7515.signingInput(
+    Uint8List verificationInput = RFC7515.verificationInput(
         payload: jsonWebSignature.payload,
-        protectedHeader: jsonWebSignature.header.protected);
+        protectedHeader: jsonWebSignature.protected);
 
     if (jsonWebKey.keyType == KeyType.ec) {
       PointyCastleCryptoProvider pointyCastleCryptoProvider =
           PointyCastleCryptoProvider();
 
-      if (jsonWebSignature.header.algorithm.digestLength >
+      if ((_header as JwsJoseHeader).algorithm.digestLength >
           (jsonWebKey.key as EcPublicKey).crv.length) {
         throw Exception(
             'Curve cardinality is smaller than digest length, that\'s not possible.');
@@ -638,9 +642,9 @@ class Jwt {
           Uint8List.fromList(signature.getRange(32, 64).toList()));
 
       if (pointyCastleCryptoProvider.verify(
-          data: signingInput,
+          data: verificationInput,
           publicKey: jsonWebKey.key as EcPublicKey,
-          algorithm: jsonWebSignature.header.algorithm,
+          algorithm: _header.algorithm,
           signature: ecSignature)) {
         _isVerified = true;
         _parseRegisteredClaims();
@@ -675,10 +679,10 @@ class Jwt {
           additionalProtected: null);
     }
 
-    Map<String, dynamic> signedPayload = Map.of(payload);
+    Map<String, dynamic> payload = Map.of(this.payload);
 
     Uint8List signingInput = RFC7515.signingInput(
-        protectedHeader: jwsHeader.protected, payload: signedPayload);
+        protectedHeader: jwsHeader.protected, payload: payload);
 
     if (jsonWebKey.keyType == KeyType.ec) {
       PointyCastleCryptoProvider pointyCastleCryptoProvider =
@@ -698,9 +702,10 @@ class Jwt {
           algorithm: signingAlgorithm);
 
       return Jws(
-        payload: signedPayload,
+        payload: RFC7515.bytes(payload),
         signature: signature,
-        header: jwsHeader,
+        header: jwsHeader.unprotected,
+        protected: RFC7515.bytes(jwsHeader.protected),
       );
     } else {
       throw Exception();
@@ -735,8 +740,7 @@ class Jwt {
     }
     if (notBefore == null && claims['nbf'] != null) {
       try {
-        notBefore =
-            DateTime.fromMillisecondsSinceEpoch(claims['nbf'] * 1000);
+        notBefore = DateTime.fromMillisecondsSinceEpoch(claims['nbf'] * 1000);
       } on Exception {
         rethrow;
       }
@@ -1002,8 +1006,9 @@ class KbJwt extends Jwt {
   }
 
   KbJwt.verified(super.jsonWebSignature, super.jsonWebKey)
-      : sdHash = base64Url.decode(jsonWebSignature.payload['sd_hash']),
-        nonce = jsonWebSignature.payload['nonce'],
+      : sdHash = base64Url.decode(
+            json.decode(utf8.decode(jsonWebSignature.payload))['sd_hash']),
+        nonce = json.decode(utf8.decode(jsonWebSignature.payload))['nonce'],
         super.verified();
 
   @override
@@ -1014,6 +1019,9 @@ class KbJwt extends Jwt {
     Jws jws =
         super.sign(jsonWebKey: jsonWebKey, signingAlgorithm: signingAlgorithm);
     return KbJws(
-        payload: jws.payload, signature: jws.signature, header: jws.header);
+        payload: jws.payload,
+        signature: jws.signature,
+        protected: jws.protected,
+        header: jws.header);
   }
 }
