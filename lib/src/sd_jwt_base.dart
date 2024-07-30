@@ -732,10 +732,14 @@ class Jwt {
       } on Exception {
         rethrow;
       }
-      //expirationTime = claims['exp'];
     }
     if (notBefore == null && claims['nbf'] != null) {
-      notBefore = claims['nbf'];
+      try {
+        notBefore =
+            DateTime.fromMillisecondsSinceEpoch(claims['nbf'] * 1000);
+      } on Exception {
+        rethrow;
+      }
     }
     if (issuedAt == null && claims['iat'] != null) {
       try {
