@@ -49,22 +49,21 @@ class SdJwt extends Jwt {
     return map;
   }
 
-  SdJwt(
-      {required super.claims,
-      Map<String, dynamic>? alwaysDisclosed,
-      SaltAlgorithm saltAlgorithm = SaltAlgorithm.randomBase64UrlNoPadding256,
-      DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha256,
-      super.issuer,
-      super.subject,
-      super.audience,
-      super.expirationTime,
-      super.notBefore,
-      super.issuedAt,
-      super.jwtId,
-      super.header,
-      // this.decoyLevel = 0,
-      })
-      : _saltAlgorithm = saltAlgorithm,
+  SdJwt({
+    required super.claims,
+    Map<String, dynamic>? alwaysDisclosed,
+    SaltAlgorithm saltAlgorithm = SaltAlgorithm.randomBase64UrlNoPadding256,
+    DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha256,
+    super.issuer,
+    super.subject,
+    super.audience,
+    super.expirationTime,
+    super.notBefore,
+    super.issuedAt,
+    super.jwtId,
+    super.header,
+    // this.decoyLevel = 0,
+  })  : _saltAlgorithm = saltAlgorithm,
         _digestAlgorithm = digestAlgorithm {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
@@ -670,7 +669,13 @@ class Jwt {
       audience = claims['aud'];
     }
     if (expirationTime == null && claims['exp'] != null) {
-      expirationTime = claims['exp'];
+      try {
+        expirationTime =
+            DateTime.fromMillisecondsSinceEpoch(claims['exp'] * 1000);
+      } on Exception {
+        rethrow;
+      }
+      //expirationTime = claims['exp'];
     }
     if (notBefore == null && payload['nbf'] != null) {
       notBefore = claims['nbf'];
