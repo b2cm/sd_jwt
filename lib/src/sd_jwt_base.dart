@@ -726,7 +726,13 @@ class Jwt {
       audience = claims['aud'];
     }
     if (expirationTime == null && claims['exp'] != null) {
-      expirationTime = claims['exp'];
+      try {
+        expirationTime =
+            DateTime.fromMillisecondsSinceEpoch(claims['exp'] * 1000);
+      } on Exception {
+        rethrow;
+      }
+      //expirationTime = claims['exp'];
     }
     if (notBefore == null && claims['nbf'] != null) {
       notBefore = claims['nbf'];

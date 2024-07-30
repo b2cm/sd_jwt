@@ -1,9 +1,6 @@
 import 'dart:convert';
 
 import 'package:sd_jwt/sd_jwt.dart';
-import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
-import 'package:sd_jwt/src/sd_jwt_jwk.dart';
-import 'package:sd_jwt/src/sd_jwt_jws.dart';
 
 Future<void> main() async {
   // At first, you need some key material for signing and verification tasks.
@@ -74,10 +71,10 @@ Future<void> main() async {
   // Sign the SD-JWT and send the resulting SD-JWS to the holder
 
   SdJws awesomeSigned = awesome.sign(
-      jsonWebKey: issuerJwk, signingAlgorithm: SigningAlgorithm.ecdsaSha256Prime);
+      jsonWebKey: issuerJwk,
+      signingAlgorithm: SigningAlgorithm.ecdsaSha256Prime);
 
   String awesomeSignedCompact = awesomeSigned.toCompactSerialization();
-
 
   // A HOLDER now can remove some Disclosures and then bind his key material to
   // the SD-JWS by adding a Key Binding JWS (KB-JWS):
@@ -85,7 +82,8 @@ Future<void> main() async {
   awesomeSigned = SdJws.fromCompactSerialization(awesomeSignedCompact);
   print(json.encode(awesomeSigned.jsonContent()));
 
-  Disclosure toRemove = awesomeSigned.disclosures!.singleWhere((e) => e.key == 'street_address');
+  Disclosure toRemove =
+      awesomeSigned.disclosures!.singleWhere((e) => e.key == 'street_address');
   awesomeSigned.disclosures!.remove(toRemove);
   // awesomeSigned.disclosures!.clear();
 
@@ -98,7 +96,8 @@ Future<void> main() async {
       issuedAt: DateTime.now(),
       nonce: nonce);
 
-  String awesomePresentationCompact = awesomePresentation.toCompactSerialization();
+  String awesomePresentationCompact =
+      awesomePresentation.toCompactSerialization();
 
   // Send the resulting SD-JWS to the verifier
 
@@ -106,7 +105,8 @@ Future<void> main() async {
   // JWT is present, the corresponding public key can be found, e.g., in the
   // value of the `cnf` (confirmation) property of the issuer signed SD-JWS:
 
-  awesomePresentation = SdJws.fromCompactSerialization(awesomePresentationCompact);
+  awesomePresentation =
+      SdJws.fromCompactSerialization(awesomePresentationCompact);
 
   SdJwt awesomeVerified;
   KbJwt kbJwtVerified;
@@ -125,7 +125,6 @@ Future<void> main() async {
     return;
   }
 
-
 // Currently, only the signatures of both JWSs are verified. This means
 // that their payloads are considered trustworthy. Next, verify if the digest
 // of the `sd_hash` (sdHash) property matches the specified digest of the SD-JWS:
@@ -134,5 +133,4 @@ Future<void> main() async {
       base64.encode(kbJwtVerified.sdHash));
 
   print(json.encode(awesomeVerified));
-
 }
