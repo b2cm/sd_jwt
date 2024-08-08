@@ -88,6 +88,21 @@ class SdJwt extends Jwt {
     }
   }
 
+  SdJwt.unverified(SdJws sdJws)
+      : _digestAlgorithm = DigestAlgorithm.values.singleWhere((e) =>
+  e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
+        decoyFactor = DecoyFactor.none,
+        super.unverified(sdJws) {
+    claims.remove('_sd_alg');
+
+    if (sdJws.disclosures != null) {
+      _disclosures = _deepCopyMap(claims);
+      _disclosures = _restoreDisclosuresMap(_disclosures, sdJws.disclosures!);
+      claims = _deepCopyMap(_disclosures);
+      claims = _restoreClaimsMap(claims);
+    }
+  }
+
   SdJwt.fromJson(Map<String, dynamic> map)
       : _digestAlgorithm = DigestAlgorithm.values
             .singleWhere((e) => e.name == map['payload']['_sd_alg']),
@@ -663,6 +678,16 @@ class Jwt {
         throw Exception('Verification failed.');
       }
     }
+  }
+
+  Jwt.unverified(Jws jsonWebSignature)
+      : claims = Map.of(json.decode(utf8.decode(jsonWebSignature.payload))),
+        _header = JwsJoseHeader.fromJson({
+          'protected': json.decode(utf8.decode(jsonWebSignature.protected)),
+          'unprotected': jsonWebSignature.header
+        }) {
+    _parseRegisteredClaims();
+    _removeRegisteredClaims();
   }
 
   Jws sign(

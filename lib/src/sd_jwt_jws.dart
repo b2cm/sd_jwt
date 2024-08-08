@@ -98,11 +98,6 @@ class SdJws extends Jws {
   }
 
   @override
-  SdJwt verified(Jwk jsonWebKey) {
-    return SdJwt.verified(this, jsonWebKey);
-  }
-
-  @override
   bool verify(Jwk jsonWebKey) {
     try {
       SdJwt.verified(this, jsonWebKey);
@@ -111,6 +106,15 @@ class SdJws extends Jws {
       return false;
     }
   }
+
+
+  @override
+  SdJwt verified(Jwk jsonWebKey) {
+    return SdJwt.verified(this, jsonWebKey);
+  }
+
+  @override
+  SdJwt unverified() => SdJwt.unverified(this);
 
   Uint8List get digest {
     String compactSerialization = super.toCompactSerialization();
@@ -289,9 +293,10 @@ class Jws {
     }
   }
 
-  Jwt verified(Jwk jsonWebKey) {
-    return Jwt.verified(this, jsonWebKey);
-  }
+  Jwt verified(Jwk jsonWebKey) => Jwt.verified(this, jsonWebKey);
+
+  Jwt unverified() => Jwt.unverified(this);
+
 }
 
 class KbJws extends Jws {
