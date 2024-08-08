@@ -13,7 +13,6 @@ class SdJws extends Jws {
 
   Disclosures? get disclosures => _disclosures;
 
-
   SdJws({
     required super.payload,
     required super.signature,
@@ -22,26 +21,24 @@ class SdJws extends Jws {
     Disclosures? disclosures,
     this.keyBindingJws,
     required DigestAlgorithm digestAlgorithm,
-  }) : _digestAlgorithm = digestAlgorithm, _disclosures = disclosures;
+  })  : _digestAlgorithm = digestAlgorithm,
+        _disclosures = disclosures;
 
   factory SdJws.fromCompactSerialization(String string) {
     List<Uint8List> disclosures = [];
     List<String> elements = string.split('~');
 
-    String compactJws = elements.first;
-    List<String> other = elements.sublist(1, elements.length);
+    Jws jws = Jws.fromCompactSerialization(elements.first);
+    DigestAlgorithm digestAlgorithm = DigestAlgorithm.values.singleWhere(
+        (e) => e.name == json.decode(utf8.decode(jws.payload))['_sd_alg']);
 
-    Jws jws = Jws.fromCompactSerialization(compactJws);
-    DigestAlgorithm digestAlgorithm = DigestAlgorithm.values
-        .singleWhere((e) => e.name == json.decode(utf8.decode(jws.payload))['_sd_alg']);
+    for (int i = 1; i < elements.length - 1; i++) {
+      disclosures.add(base64Url.decode(addPaddingToBase64(elements[i])));
+    }
 
     KbJws? kbJws;
-    for (String element in other) {
-      if (element.startsWith('Wy')) {
-        disclosures.add(base64Url.decode(addPaddingToBase64(element)));
-      } else if (element.startsWith('ey') && element.contains('.')) {
-        kbJws = KbJws.fromCompactSerialization(element);
-      }
+    if (elements.last.isNotEmpty) {
+      kbJws = KbJws.fromCompactSerialization(elements.last);
     }
 
     return SdJws(
@@ -56,13 +53,13 @@ class SdJws extends Jws {
 
   @override
   String toCompactSerialization() {
-    String compactSerialization = super.toCompactSerialization();
+    String compactSerialization = '${super.toCompactSerialization()}~';
     _disclosures != null
         ? compactSerialization +=
-            '~${_disclosures!.origin.map((e) => removePaddingFromBase64(base64Url.encode(e))).join('~')}'
+            '${_disclosures!.origin.map((e) => removePaddingFromBase64(base64Url.encode(e))).join('~')}~'
         : null;
     keyBindingJws != null
-        ? compactSerialization += '~${keyBindingJws!.toCompactSerialization()}'
+        ? compactSerialization += keyBindingJws!.toCompactSerialization()
         : null;
     return compactSerialization;
   }
@@ -107,7 +104,6 @@ class SdJws extends Jws {
     }
   }
 
-
   @override
   SdJwt verified(Jwk jsonWebKey) {
     return SdJwt.verified(this, jsonWebKey);
@@ -144,15 +140,8 @@ class SdJws extends Jws {
             nonce: nonce,
             sdHash: sdHash)
         .sign(jsonWebKey: jsonWebKey, signingAlgorithm: signingAlgorithm);
-    return SdJws(
-      payload: payload,
-      signature: signature,
-      protected: protected,
-      header: header,
-      disclosures: disclosures,
-      keyBindingJws: kbJws,
-      digestAlgorithm: _digestAlgorithm,
-    );
+    keyBindingJws = kbJws;
+    return this;
   }
 }
 
@@ -296,7 +285,6 @@ class Jws {
   Jwt verified(Jwk jsonWebKey) => Jwt.verified(this, jsonWebKey);
 
   Jwt unverified() => Jwt.unverified(this);
-
 }
 
 class KbJws extends Jws {
