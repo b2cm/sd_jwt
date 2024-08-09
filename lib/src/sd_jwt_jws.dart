@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:json_path/json_path.dart';
 import 'package:sd_jwt/sd_jwt.dart';
 import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
-import 'package:sd_jwt/src/sd_jwt_base.dart';
 import 'package:sd_jwt/src/sd_jwt_utils.dart';
 
 class SdJws extends Jws {
@@ -92,6 +92,101 @@ class SdJws extends Jws {
       });
     }
     return map;
+  }
+
+  List<String> _findParentKeys(JsonPath path, SdJwt sdJwt) {
+    List<String> salts = [];
+    String jp = path.toString();
+    var split = jp.split('.');
+    if (split.length > 2) {
+      split.removeLast();
+      split.removeAt(0);
+      return split;
+    } else if (split.length == 2) {
+      split.removeAt(0);
+      return split;
+    }
+
+    return salts;
+  }
+
+  SdJws disclose(List<JsonPath> toDisclose) {
+    if (disclosures == null || disclosures!.isEmpty) {
+      // Nothing to disclose
+      return this;
+    }
+
+    var sdJwt = unverified();
+    List<String> disclosureKeys = [];
+    List<String> disclosureSalts = []; // Used for list elements
+
+    for (var path in toDisclose) {
+      var match = path.read(sdJwt.disclosures);
+      if (match.isNotEmpty) {
+        for (var m in match) {
+          if (m.value is Disclosure) {
+            var parsedDisclosure = m.value as Disclosure;
+            if (parsedDisclosure.key != null) {
+              disclosureKeys.add(parsedDisclosure.key!);
+            } else {
+              disclosureSalts.add(parsedDisclosure.salt);
+            }
+            disclosureKeys.addAll(_findParentKeys(path, sdJwt));
+          } else if (m.value is List) {
+            for (var element in m.value as List) {
+              if (element is Disclosure) {
+                if (element.key != null) {
+                  disclosureKeys.add(element.key!);
+                } else {
+                  disclosureSalts.add(element.salt);
+                }
+              }
+            }
+          } else if (m.value is Map) {
+            // here we assume there is an object which should be disclosed
+            for (var entry in (m.value as Map).entries) {
+              if (entry.value is Disclosure) {
+                var parsedDisclosure = entry.value as Disclosure;
+                if (parsedDisclosure.key != null) {
+                  disclosureKeys.add(parsedDisclosure.key!);
+                } else {
+                  disclosureSalts.add(parsedDisclosure.salt);
+                }
+                disclosureKeys.addAll(_findParentKeys(path, sdJwt));
+              } else if (entry.value is List) {
+                for (var element in entry.value) {
+                  if (element is Disclosure) {
+                    if (element.key != null) {
+                      disclosureKeys.add(element.key!);
+                    } else {
+                      disclosureSalts.add(element.salt);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    List<Uint8List> foundDisclosures = [];
+    for (int i = 0; i < disclosures!.length; i++) {
+      var d = disclosures![i];
+      if (d.key != null && disclosureKeys.contains(d.key)) {
+        foundDisclosures.add(disclosures!.origin[i]);
+      } else if (disclosureSalts.contains(d.salt)) {
+        foundDisclosures.add(disclosures!.origin[i]);
+      }
+    }
+
+    return SdJws(
+        payload: payload,
+        signature: signature,
+        protected: protected,
+        header: header,
+        digestAlgorithm: _digestAlgorithm,
+        disclosures: Disclosures.fromBytes(foundDisclosures));
   }
 
   @override
