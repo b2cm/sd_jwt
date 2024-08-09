@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:json_path/json_path.dart';
 import 'package:sd_jwt/sd_jwt.dart';
 
 Future<void> main() async {
@@ -76,20 +77,23 @@ Future<void> main() async {
 
   String awesomeSignedCompact = awesomeSigned.toCompactSerialization();
 
-  // A HOLDER now can remove some Disclosures and then bind his key material to
+  // A HOLDER now can disclose som attributes and then bind his key material to
   // the SD-JWS by adding a Key Binding JWS (KB-JWS):
 
   awesomeSigned = SdJws.fromCompactSerialization(awesomeSignedCompact);
   print(json.encode(awesomeSigned.jsonContent()));
 
-  Disclosure toRemove =
-      awesomeSigned.disclosures!.singleWhere((e) => e.key == 'street_address');
-  awesomeSigned.disclosures!.remove(toRemove);
+  // Disclosure toRemove =
+  //     awesomeSigned.disclosures!.singleWhere((e) => e.key == 'street_address');
+  // awesomeSigned.disclosures!.remove(toRemove);
   // awesomeSigned.disclosures!.clear();
+
+  var toPresent = awesomeSigned.disclose(
+      [JsonPath(r'$.address.street_address'), JsonPath(r'$.given_name')]);
 
   String nonce = '1234567890'; // promoted by verifier
   String audience = 'https://verfifier.example.tld'; // promoted by verifier
-  SdJws awesomePresentation = awesomeSigned.bind(
+  SdJws awesomePresentation = toPresent.bind(
       jsonWebKey: holderJwk,
       signingAlgorithm: SigningAlgorithm.ecdsaSha256Prime,
       audience: audience,

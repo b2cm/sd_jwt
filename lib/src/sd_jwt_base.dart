@@ -90,7 +90,7 @@ class SdJwt extends Jwt {
 
   SdJwt.unverified(SdJws sdJws)
       : _digestAlgorithm = DigestAlgorithm.values.singleWhere((e) =>
-  e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
+            e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
         decoyFactor = DecoyFactor.none,
         super.unverified(sdJws) {
     claims.remove('_sd_alg');
@@ -280,7 +280,13 @@ class SdJwt extends Jwt {
           if ((entry.value as List).contains(
               removePaddingFromBase64(base64Url.encode(_digest(disclosure))))) {
             Disclosure disclosureObject = Disclosure.fromBytes(disclosure);
-            tmp[disclosureObject.key!] = disclosureObject;
+            if (disclosureObject.value is Map &&
+                disclosureObject.value.containsKey('_sd')) {
+              tmp[disclosureObject.key!] =
+                  _restoreDisclosuresMap(disclosureObject.value, disclosures);
+            } else {
+              tmp[disclosureObject.key!] = disclosureObject;
+            }
           }
         }
       } else if (entry.value is Map) {
@@ -630,7 +636,8 @@ class Jwt {
       this.issuedAt,
       this.jwtId,
       JoseHeader? header})
-      : _header = header ??= JoseHeader(), claims = Map.of(claims) {
+      : _header = header ??= JoseHeader(),
+        claims = Map.of(claims) {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
   }
