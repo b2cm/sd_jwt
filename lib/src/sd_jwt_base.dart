@@ -122,12 +122,17 @@ class SdJwt extends Jwt {
     }
   }
 
+  // Builds disclosures from payload, except registered claims.
+  //
+  // Salt algorithm can be set by SaltAlgorithm object. Defaults to Base64Url
+  // encoded random data with length of 256 bits. Padding will be removed.
   void build({SaltAlgorithm? saltAlgorithm}) {
-    if (saltAlgorithm == null && _saltAlgorithm == null) {
-      throw Exception('Cannot build disclosures, no salt algorithm set.');
-    }
     _disclosures = _createDisclosuresMap(
-        super.payload, saltAlgorithm ?? _saltAlgorithm!, _digestAlgorithm);
+        super.payload,
+        saltAlgorithm ??
+            _saltAlgorithm ??
+            SaltAlgorithm.randomBase64UrlNoPadding256,
+        _digestAlgorithm);
   }
 
   @override
