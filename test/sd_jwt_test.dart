@@ -1,9 +1,7 @@
-import 'package:sd_jwt/sd_jwt.dart';
-import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
-import 'package:sd_jwt/src/sd_jwt_jwk.dart';
-import 'package:sd_jwt/src/sd_jwt_jws.dart';
-import 'package:test/test.dart';
 import 'package:jose/jose.dart';
+import 'package:sd_jwt/sd_jwt.dart';
+import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
+import 'package:test/test.dart';
 
 void main() {
   group('Basic tests', () {
@@ -19,7 +17,10 @@ void main() {
         'vc': 'VerifiableCredential'
         // }, jsonWebKey: Jwk.fromJson(jsonWebKey.toJson()));
       });
-      Jws sdJws = awesome.sign(jsonWebKey: Jwk.fromJson(jsonWebKey.toJson()));
+      Jws sdJws = await awesome.sign(
+          signingAlgorithm: SigningAlgorithm.ecdsaSha256Koblitz,
+          signer: PointyCastleCryptoProvider(
+              Jwk.fromJson(jsonWebKey.toJson()).key as EcPrivateKey));
       print(sdJws.toCompactSerialization());
       print(sdJws.toJson());
       JsonWebSignature jsonWebSignature =
@@ -40,7 +41,9 @@ void main() {
         'vc': 'VerifiableCredential'
         // }, jsonWebKey: Jwk.fromJson(jsonWebKey.toJson()));
       });
-      Jws sdJws = awesome.sign(jsonWebKey: jsonWebKey);
+      Jws sdJws = await awesome.sign(
+          signingAlgorithm: SigningAlgorithm.ecdsaSha256Koblitz,
+          signer: PointyCastleCryptoProvider(jsonWebKey.key as EcPrivateKey));
       print(sdJws.toCompactSerialization());
       print(sdJws.toJson());
       JsonWebSignature jsonWebSignature =
@@ -52,238 +55,201 @@ void main() {
   });
 
   group('Default algorithms', () {
-    setUp(() {
-
-    });
+    setUp(() {});
 
     test('ECDSA using P-256 and SHA-256', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256, SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
-      bool result = await _verifySdJws(
-          sdJws,
-          jsonWebKeyStore);
-      expect(
-          result,
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256,
+          SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
+      bool result = await _verifySdJws(sdJws, jsonWebKeyStore);
+      expect(result, isTrue);
     });
     test('ECDSA using P-256K and SHA-256', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256k, SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-          sdJws,
-          jsonWebKeyStore),
-      isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256k,
+          SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
     test('ECDSA using P-384 and SHA-384', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p384, SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-          sdJws,
-          jsonWebKeyStore),
-      isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p384,
+          SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
     test('ECDSA using P-521 and SHA-512', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p521, SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-          sdJws,
-          jsonWebKeyStore),
-      isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p521,
+          SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
   });
   group('All algorithms', () {
-    setUp(() {
-
-    });
+    setUp(() {});
 
     test('ECDSA using P-256 and SHA-256', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256, SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
-      bool result = await _verifySdJws(
-          sdJws,
-          jsonWebKeyStore);
-      expect(
-          result,
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256,
+          SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
+      bool result = await _verifySdJws(sdJws, jsonWebKeyStore);
+      expect(result, isTrue);
     });
 
     test('ECDSA using P-256 and SHA-256K', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256, SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
-      bool result = await _verifySdJws(
-          sdJws,
-          jsonWebKeyStore);
-      expect(
-          result,
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256,
+          SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
+      bool result = await _verifySdJws(sdJws, jsonWebKeyStore);
+      expect(result, isTrue);
     });
 
     test('ECDSA using P-256 and SHA-384', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
       try {
-        Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256, SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
+        Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256,
+            SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
         await _verifySdJws(sdJws, jsonWebKeyStore);
-      } catch (e){
+      } catch (e) {
         print(e);
-        expect(e.toString(), 'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
+        expect(e.toString(),
+            'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
       }
     });
 
     test('ECDSA using P-256 and SHA-512', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
       try {
-        Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256, SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
+        Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256,
+            SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
         await _verifySdJws(sdJws, jsonWebKeyStore);
-      } catch (e){
+      } catch (e) {
         print(e);
-        expect(e.toString(), 'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
+        expect(e.toString(),
+            'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
       }
     });
 
     test('ECDSA using P-256K and SHA-256', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256k, SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256k,
+          SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-256K and SHA-256K', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256k, SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256k,
+          SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-256K and SHA-384', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
       try {
-        Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256k, SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
+        Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256k,
+            SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
         await _verifySdJws(sdJws, jsonWebKeyStore);
-      } catch (e){
+      } catch (e) {
         print(e);
-        expect(e.toString(), 'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
+        expect(e.toString(),
+            'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
       }
-
     });
 
     test('ECDSA using P-256K and SHA-512', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
       try {
-        Jws sdJws = _generateSdJws(KeyType.ec, Curve.p256k, SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
+        Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p256k,
+            SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
         await _verifySdJws(sdJws, jsonWebKeyStore);
-      } catch (e){
+      } catch (e) {
         print(e);
-        expect(e.toString(), 'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
+        expect(e.toString(),
+            'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
       }
     });
 
     test('ECDSA using P-384 and SHA-256', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p384, SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p384,
+          SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-384 and SHA-256K', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p384, SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p384,
+          SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-384 and SHA-384', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p384, SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p384,
+          SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-384 and SHA-512', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
       try {
-        Jws sdJws = _generateSdJws(KeyType.ec, Curve.p384, SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
+        Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p384,
+            SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
         await _verifySdJws(sdJws, jsonWebKeyStore);
-      } catch (e){
+      } catch (e) {
         print(e);
-        expect(e.toString(), 'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
+        expect(e.toString(),
+            'Exception: Curve cardinality is smaller than digest length, that\'s not possible.');
       }
     });
 
     test('ECDSA using P-521 and SHA-256', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p521, SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p521,
+          SigningAlgorithm.ecdsaSha256Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-521 and SHA-256K', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p521, SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p521,
+          SigningAlgorithm.ecdsaSha256Koblitz, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-521 and SHA-384', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p521, SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p521,
+          SigningAlgorithm.ecdsaSha384Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
 
     test('ECDSA using P-521 and SHA-512', () async {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
-      Jws sdJws = _generateSdJws(KeyType.ec, Curve.p521, SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
-      expect(
-          await _verifySdJws(
-              sdJws,
-              jsonWebKeyStore),
-          isTrue);
+      Jws sdJws = await _generateSdJws(KeyType.ec, Curve.p521,
+          SigningAlgorithm.ecdsaSha512Prime, jsonWebKeyStore);
+      expect(await _verifySdJws(sdJws, jsonWebKeyStore), isTrue);
     });
   });
 }
 
-Jws _generateSdJws(KeyType keyType, Curve curve, SigningAlgorithm algorithm, JsonWebKeyStore jsonWebKeyStore) {
-  Jwk jsonWebKey =
-      Jwk(keyType: keyType, key: EcPrivateKey.generate(curve), algorithm: algorithm);
+Future<Jws> _generateSdJws(KeyType keyType, Curve curve,
+    SigningAlgorithm algorithm, JsonWebKeyStore jsonWebKeyStore) async {
+  Jwk jsonWebKey = Jwk(
+      keyType: keyType,
+      key: EcPrivateKey.generate(curve),
+      algorithm: algorithm);
   jsonWebKeyStore.addKey(JsonWebKey.fromJson(jsonWebKey.toJson()));
-  var awesome = Jwt(claims: {
-    'vc': 'VerifiableCredential'
-  });
-  Jws sdJws = awesome.sign(jsonWebKey: jsonWebKey);
+  var awesome = Jwt(claims: {'vc': 'VerifiableCredential'});
+  Jws sdJws = await awesome.sign(
+      signingAlgorithm: algorithm,
+      signer: PointyCastleCryptoProvider(jsonWebKey.key as EcPrivateKey));
   print(sdJws.toCompactSerialization());
   print(sdJws.toJson());
   return sdJws;
 }
 
 Future<bool> _verifySdJws(Jws sdJws, JsonWebKeyStore jsonWebKeyStore) async {
-  JsonWebSignature jsonWebSignature =
-      JsonWebSignature.fromCompactSerialization(sdJws.toCompactSerialization().split('~').first);
+  JsonWebSignature jsonWebSignature = JsonWebSignature.fromCompactSerialization(
+      sdJws.toCompactSerialization().split('~').first);
   return jsonWebSignature.verify(jsonWebKeyStore);
 }

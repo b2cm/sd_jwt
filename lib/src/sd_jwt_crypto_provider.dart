@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:sd_jwt/src/sd_jwt_jwk.dart';
@@ -10,14 +11,11 @@ abstract class CryptoProvider {
   Uint8List digest(
       {required Uint8List data, required DigestAlgorithm algorithm});
 
-  Uint8List sign(
-      {required Uint8List data,
-      required PrivateKey privateKey,
-      required SigningAlgorithm algorithm});
+  FutureOr<Uint8List> sign(
+      {required Uint8List data, required SigningAlgorithm algorithm});
 
   bool verify(
       {required Uint8List data,
-      required PublicKey publicKey,
       required SigningAlgorithm algorithm,
       required Signature signature});
 }

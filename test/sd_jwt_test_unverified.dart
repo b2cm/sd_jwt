@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:sd_jwt/sd_jwt.dart';
+import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:test/test.dart';
 
 void main() {
-
   Map<String, dynamic> claims = {
     "sub": "6c5c0a49-b589-431d-bae7-219122a9ec2c",
     "address": {
@@ -15,7 +15,7 @@ void main() {
     }
   };
 
-  test('simple', () {
+  test('simple', () async {
     SdJwt sdJwt = SdJwt(
         claims: claims,
         issuer: "https://issuer.example.com",
@@ -23,7 +23,9 @@ void main() {
         expirationTime: DateTime.fromMillisecondsSinceEpoch(1883000000 * 1000));
 
     Jwk jwk = Jwk(keyType: KeyType.ec, key: EcPrivateKey.generate(Curve.p256));
-    SdJws sdJws = sdJwt.sign(jsonWebKey: jwk, signingAlgorithm: SigningAlgorithm.ecdsaSha256Koblitz);
+    SdJws sdJws = await sdJwt.sign(
+        signer: PointyCastleCryptoProvider(jwk.key as EcPrivateKey),
+        signingAlgorithm: SigningAlgorithm.ecdsaSha256Koblitz);
     SdJwt unverified = sdJws.unverified();
 
     print(json.encode(unverified));

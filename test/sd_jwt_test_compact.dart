@@ -1,4 +1,5 @@
 import 'package:sd_jwt/sd_jwt.dart';
+import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -12,7 +13,7 @@ void main() {
     }
   };
 
-  test('tildes', () {
+  test('tildes', () async {
     SdJwt sdJwt = SdJwt(
         claims: claims,
         issuer: "https://issuer.example.com",
@@ -20,15 +21,16 @@ void main() {
         expirationTime: DateTime.fromMillisecondsSinceEpoch(1883000000 * 1000));
 
     Jwk jwk = Jwk(keyType: KeyType.ec, key: EcPrivateKey.generate(Curve.p256));
-    SdJws sdJws = sdJwt.sign(
-        jsonWebKey: jwk, signingAlgorithm: SigningAlgorithm.ecdsaSha256Koblitz);
+    SdJws sdJws = await sdJwt.sign(
+        signer: PointyCastleCryptoProvider(jwk.key as EcPrivateKey),
+        signingAlgorithm: SigningAlgorithm.ecdsaSha256Koblitz);
     String compact = sdJws.toCompactSerialization();
     print(compact);
 
     SdJws sdJwsFromCompact = SdJws.fromCompactSerialization(compact);
 
-    sdJwsFromCompact.bind(
-        jsonWebKey: jwk,
+    await sdJwsFromCompact.bind(
+        signer: PointyCastleCryptoProvider(jwk.key as EcPublicKey),
         audience: 'audience',
         issuedAt: DateTime.now(),
         nonce: 'nonce',

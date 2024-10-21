@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:json_path/json_path.dart';
 import 'package:sd_jwt/sd_jwt.dart';
+import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 
 Future<void> main() async {
   // At first, you need some key material for signing and verification tasks.
@@ -68,11 +69,12 @@ Future<void> main() async {
   Jwk holderJwk =
       Jwk(keyType: KeyType.ec, key: EcPrivateKey.generate(Curve.p256));
   awesome.confirmation = JwkConfirmation(holderJwk.public);
-
+  var holderCryptoProvider =
+      PointyCastleCryptoProvider(holderJwk.key as EcPrivateKey);
   // Sign the SD-JWT and send the resulting SD-JWS to the holder
 
-  SdJws awesomeSigned = awesome.sign(
-      jsonWebKey: issuerJwk,
+  SdJws awesomeSigned = await awesome.sign(
+      signer: holderCryptoProvider,
       signingAlgorithm: SigningAlgorithm.ecdsaSha256Prime);
 
   String awesomeSignedCompact = awesomeSigned.toCompactSerialization();
@@ -93,8 +95,8 @@ Future<void> main() async {
 
   String nonce = '1234567890'; // promoted by verifier
   String audience = 'https://verfifier.example.tld'; // promoted by verifier
-  SdJws awesomePresentation = toPresent.bind(
-      jsonWebKey: holderJwk,
+  SdJws awesomePresentation = await toPresent.bind(
+      signer: holderCryptoProvider,
       signingAlgorithm: SigningAlgorithm.ecdsaSha256Prime,
       audience: audience,
       issuedAt: DateTime.now(),

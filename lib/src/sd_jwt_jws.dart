@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -220,21 +221,21 @@ class SdJws extends Jws {
         data: digestInput, algorithm: _digestAlgorithm);
   }
 
-  SdJws bind(
-      {required Jwk jsonWebKey,
+  FutureOr<SdJws> bind(
+      {required CryptoProvider signer,
       required String audience,
       required DateTime issuedAt,
       required String nonce,
       SigningAlgorithm? signingAlgorithm,
-      DigestAlgorithm? digestAlgorithm}) {
+      DigestAlgorithm? digestAlgorithm}) async {
     Uint8List sdHash = digest;
 
-    KbJws kbJws = KbJwt(
+    KbJws kbJws = await KbJwt(
             audience: audience,
             issuedAt: issuedAt,
             nonce: nonce,
             sdHash: sdHash)
-        .sign(jsonWebKey: jsonWebKey, signingAlgorithm: signingAlgorithm);
+        .sign(signer: signer, signingAlgorithm: signingAlgorithm);
     keyBindingJws = kbJws;
     return this;
   }

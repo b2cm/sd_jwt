@@ -10,15 +10,23 @@ import '../sd_jwt_utils.dart';
 class PointyCastleCryptoProvider implements CryptoProvider {
   @override
   String get name => 'pointy_castle';
+  final AsymmetricKey? key;
 
-  PointyCastleCryptoProvider();
+  PointyCastleCryptoProvider([this.key]);
 
   @override
   Uint8List sign(
-      {required Uint8List data,
-      required PrivateKey privateKey,
-      required SigningAlgorithm algorithm}) {
+      {required Uint8List data, required SigningAlgorithm algorithm}) {
+    if (key is! PrivateKey) {
+      throw Exception('private key needed for signing');
+    }
+    var privateKey = key as PrivateKey;
+
     if (privateKey is EcPrivateKey) {
+      if (algorithm.digestLength > privateKey.crv.length) {
+        throw Exception(
+            'Curve cardinality is smaller than digest length, that\'s not possible.');
+      }
       pointy_castle.ECDomainParameters ecDomainParameters =
           _getECDomainParameters(privateKey.crv);
       pointy_castle.Digest digest = _getDigest(algorithm);
@@ -57,10 +65,22 @@ class PointyCastleCryptoProvider implements CryptoProvider {
   @override
   bool verify(
       {required Uint8List data,
-      required PublicKey publicKey,
       required SigningAlgorithm algorithm,
       required Signature signature}) {
+    PublicKey publicKey;
+    if (key is PrivateKey) {
+      publicKey = key!.public;
+    } else if (key is PublicKey) {
+      publicKey = key as PublicKey;
+    } else {
+      throw Exception('No key given');
+    }
+
     if (publicKey is EcPublicKey) {
+      if (algorithm.digestLength > publicKey.crv.length) {
+        throw Exception(
+            'Curve cardinality is smaller than digest length, that\'s not possible.');
+      }
       pointy_castle.ECDomainParameters ecDomainParameters =
           _getECDomainParameters(publicKey.crv);
       pointy_castle.ECPoint point = ecDomainParameters.curve.createPoint(

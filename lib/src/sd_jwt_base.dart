@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -136,14 +137,14 @@ class SdJwt extends Jwt {
   }
 
   @override
-  SdJws sign(
-      {required Jwk jsonWebKey,
+  FutureOr<SdJws> sign(
+      {required CryptoProvider signer,
       JwsJoseHeader? header,
-      SigningAlgorithm? signingAlgorithm}) {
+      SigningAlgorithm? signingAlgorithm}) async {
     List<Disclosure> disclosuresList = [];
     _getDisclosuresMap(_disclosures, disclosuresList);
     Jws jws =
-        super.sign(jsonWebKey: jsonWebKey, signingAlgorithm: signingAlgorithm);
+        await super.sign(signer: signer, signingAlgorithm: signingAlgorithm);
     return SdJws(
       payload: jws.payload,
       signature: jws.signature,
@@ -667,21 +668,15 @@ class Jwt {
 
     if (jsonWebKey.keyType == KeyType.ec) {
       PointyCastleCryptoProvider pointyCastleCryptoProvider =
-          PointyCastleCryptoProvider();
+          PointyCastleCryptoProvider(jsonWebKey.key as EcPublicKey);
 
-      if ((_header as JwsJoseHeader).algorithm.digestLength >
-          (jsonWebKey.key as EcPublicKey).crv.length) {
-        throw Exception(
-            'Curve cardinality is smaller than digest length, that\'s not possible.');
-      }
       EcSignature ecSignature = EcSignature(
           Uint8List.fromList(signature.getRange(0, 32).toList()),
           Uint8List.fromList(signature.getRange(32, 64).toList()));
 
       if (pointyCastleCryptoProvider.verify(
           data: verificationInput,
-          publicKey: jsonWebKey.key as EcPublicKey,
-          algorithm: _header.algorithm,
+          algorithm: (_header as JwsJoseHeader).algorithm,
           signature: ecSignature)) {
         _isVerified = true;
         _parseRegisteredClaims();
@@ -702,15 +697,15 @@ class Jwt {
     _removeRegisteredClaims();
   }
 
-  Jws sign(
-      {required Jwk jsonWebKey,
+  FutureOr<Jws> sign(
+      {required CryptoProvider signer,
       JwsJoseHeader? header,
-      SigningAlgorithm? signingAlgorithm}) {
-    if (jsonWebKey.algorithm == null && signingAlgorithm == null) {
+      SigningAlgorithm? signingAlgorithm}) async {
+    if (header?.algorithm == null && signingAlgorithm == null) {
       throw Exception('Signing algorithm not set!');
     }
 
-    signingAlgorithm ??= jsonWebKey.algorithm!;
+    signingAlgorithm ??= header!.algorithm;
 
     JwsJoseHeader jwsHeader;
     if (header != null) {
@@ -731,32 +726,15 @@ class Jwt {
     Uint8List signingInput = RFC7515.signingInput(
         protectedHeader: jwsHeader.protected, payload: payload);
 
-    if (jsonWebKey.keyType == KeyType.ec) {
-      PointyCastleCryptoProvider pointyCastleCryptoProvider =
-          PointyCastleCryptoProvider();
-      if (signingAlgorithm.digestLength >
-          (jsonWebKey.key as EcPrivateKey).crv.length) {
-        throw Exception(
-            'Curve cardinality is smaller than digest length, that\'s not possible.');
-      }
-      if (jsonWebKey.key is! EcPrivateKey) {
-        throw Exception('JSON Web Key contains no private key.');
-      }
+    Uint8List signature =
+        await signer.sign(data: signingInput, algorithm: signingAlgorithm);
 
-      Uint8List signature = pointyCastleCryptoProvider.sign(
-          data: signingInput,
-          privateKey: jsonWebKey.key as EcPrivateKey,
-          algorithm: signingAlgorithm);
-
-      return Jws(
-        payload: RFC7515.bytes(payload),
-        signature: signature,
-        header: jwsHeader.unprotected,
-        protected: RFC7515.bytes(jwsHeader.protected),
-      );
-    } else {
-      throw Exception();
-    }
+    return Jws(
+      payload: RFC7515.bytes(payload),
+      signature: signature,
+      header: jwsHeader.unprotected,
+      protected: RFC7515.bytes(jwsHeader.protected),
+    );
   }
 
   Map<String, dynamic> toJson() =>
@@ -1459,12 +1437,12 @@ class KbJwt extends Jwt {
         super.verified();
 
   @override
-  KbJws sign(
-      {required Jwk jsonWebKey,
+  FutureOr<KbJws> sign(
+      {required CryptoProvider signer,
       JwsJoseHeader? header,
-      SigningAlgorithm? signingAlgorithm}) {
+      SigningAlgorithm? signingAlgorithm}) async {
     Jws jws =
-        super.sign(jsonWebKey: jsonWebKey, signingAlgorithm: signingAlgorithm);
+        await super.sign(signer: signer, signingAlgorithm: signingAlgorithm);
     return KbJws(
         payload: jws.payload,
         signature: jws.signature,
