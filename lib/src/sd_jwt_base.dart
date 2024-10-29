@@ -726,12 +726,15 @@ class Jwt {
     Uint8List signingInput = RFC7515.signingInput(
         protectedHeader: jwsHeader.protected, payload: payload);
 
-    Uint8List signature =
-        await signer.sign(data: signingInput, algorithm: signingAlgorithm);
+    // TODO Support for another signature types than EC
+    EcSignature signature =
+        await signer.sign(data: signingInput, algorithm: signingAlgorithm) as EcSignature;
+
+    Uint8List signatureBytes = Uint8List.fromList(signature.r + signature.s);
 
     return Jws(
       payload: RFC7515.bytes(payload),
-      signature: signature,
+      signature: signatureBytes,
       header: jwsHeader.unprotected,
       protected: RFC7515.bytes(jwsHeader.protected),
     );

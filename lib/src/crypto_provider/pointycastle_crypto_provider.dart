@@ -15,7 +15,7 @@ class PointyCastleCryptoProvider implements CryptoProvider {
   PointyCastleCryptoProvider([this.key]);
 
   @override
-  Uint8List sign(
+  Signature sign(
       {required Uint8List data, required SigningAlgorithm algorithm}) {
     if (key is! PrivateKey) {
       throw Exception('private key needed for signing');
@@ -23,12 +23,12 @@ class PointyCastleCryptoProvider implements CryptoProvider {
     var privateKey = key as PrivateKey;
 
     if (privateKey is EcPrivateKey) {
-      if (algorithm.digestLength > privateKey.crv.length) {
+      if (algorithm.digestLength > privateKey.curve.length) {
         throw Exception(
             'Curve cardinality is smaller than digest length, that\'s not possible.');
       }
       pointy_castle.ECDomainParameters ecDomainParameters =
-          _getECDomainParameters(privateKey.crv);
+          _getECDomainParameters(privateKey.curve);
       pointy_castle.Digest digest = _getDigest(algorithm);
 
       int length = {
@@ -36,7 +36,7 @@ class PointyCastleCryptoProvider implements CryptoProvider {
         Curve.p256k: 32,
         Curve.p384: 48,
         Curve.p521: 66
-      }[privateKey.crv]!;
+      }[privateKey.curve]!;
 
       pointy_castle.ECDSASigner ecdsaSigner =
           pointy_castle.ECDSASigner(digest, pointy_castle.HMac(digest, length));
@@ -51,13 +51,18 @@ class PointyCastleCryptoProvider implements CryptoProvider {
       pointy_castle.ECSignature signature =
           ecdsaSigner.generateSignature(data) as pointy_castle.ECSignature;
 
-      Uint8List bytes = Uint8List(length * 2);
-      bytes.setRange(
-          0, length, bigIntToBytes(signature.r, length).toList().reversed);
-      bytes.setRange(length, length * 2,
-          bigIntToBytes(signature.s, length).toList().reversed);
+      // Uint8List bytes = Uint8List(length * 2);
+      // bytes.setRange(
+      //     0, length, bigIntToBytes(signature.r, length).toList().reversed);
+      // bytes.setRange(length, length * 2,
+      //     bigIntToBytes(signature.s, length).toList().reversed);
+      //
+      // return bytes;
 
-      return bytes;
+      return EcSignature(
+          Uint8List.fromList(bigIntToBytes(signature.r, length).toList().reversed.toList()),
+          Uint8List.fromList(bigIntToBytes(signature.s, length).toList().reversed.toList())
+      );
     }
     throw Exception('Key type not supported.');
   }
@@ -77,12 +82,12 @@ class PointyCastleCryptoProvider implements CryptoProvider {
     }
 
     if (publicKey is EcPublicKey) {
-      if (algorithm.digestLength > publicKey.crv.length) {
+      if (algorithm.digestLength > publicKey.curve.length) {
         throw Exception(
             'Curve cardinality is smaller than digest length, that\'s not possible.');
       }
       pointy_castle.ECDomainParameters ecDomainParameters =
-          _getECDomainParameters(publicKey.crv);
+          _getECDomainParameters(publicKey.curve);
       pointy_castle.ECPoint point = ecDomainParameters.curve.createPoint(
           uInt8ListToBigInt((publicKey).x), uInt8ListToBigInt((publicKey).y));
       pointy_castle.ECPublicKey key =
@@ -95,7 +100,7 @@ class PointyCastleCryptoProvider implements CryptoProvider {
         Curve.p256k: 32,
         Curve.p384: 48,
         Curve.p521: 66
-      }[publicKey.crv]!;
+      }[publicKey.curve]!;
 
       pointy_castle.ECDSASigner ecdsaSigner =
           pointy_castle.ECDSASigner(digest, pointy_castle.HMac(digest, length));
@@ -112,28 +117,34 @@ class PointyCastleCryptoProvider implements CryptoProvider {
   }
 
   @override
-  AsymmetricKey generateEcKeyPair({required Curve curve}) {
-    pointy_castle.ECDomainParameters ecDomainParameters =
-        _getECDomainParameters(curve);
+  Key generateKeyPair({required KeyParameters keyParameters}) {
 
-    pointy_castle.ECKeyGenerator ecKeyGenerator =
-        pointy_castle.ECKeyGenerator();
+    if(keyParameters is EcKeyParameters) {
+      keyParameters as EcKeyParameters;
+      pointy_castle.ECDomainParameters ecDomainParameters =
+      _getECDomainParameters(keyParameters.curve);
 
-    ecKeyGenerator.init(pointy_castle.ParametersWithRandom(
-        pointy_castle.ECKeyGeneratorParameters(ecDomainParameters),
-        DefaultSecureRandom()));
-    pointy_castle
-        .AsymmetricKeyPair<pointy_castle.PublicKey, pointy_castle.PrivateKey>
-        asymmetricKeyPair = ecKeyGenerator.generateKeyPair();
-    pointy_castle.ECPrivateKey privateKey =
-        asymmetricKeyPair.privateKey as pointy_castle.ECPrivateKey;
-    pointy_castle.ECPublicKey publicKey =
-        asymmetricKeyPair.publicKey as pointy_castle.ECPublicKey;
-    return EcPrivateKey(
-        x: bigIntToUInt8List(publicKey.Q!.x!.toBigInteger()!),
-        y: bigIntToUInt8List(publicKey.Q!.y!.toBigInteger()!),
-        d: bigIntToUInt8List(privateKey.d!),
-        crv: curve);
+      pointy_castle.ECKeyGenerator ecKeyGenerator =
+      pointy_castle.ECKeyGenerator();
+
+      ecKeyGenerator.init(pointy_castle.ParametersWithRandom(
+          pointy_castle.ECKeyGeneratorParameters(ecDomainParameters),
+          DefaultSecureRandom()));
+      pointy_castle
+          .AsymmetricKeyPair<pointy_castle.PublicKey, pointy_castle.PrivateKey>
+      asymmetricKeyPair = ecKeyGenerator.generateKeyPair();
+      pointy_castle.ECPrivateKey privateKey =
+      asymmetricKeyPair.privateKey as pointy_castle.ECPrivateKey;
+      pointy_castle.ECPublicKey publicKey =
+      asymmetricKeyPair.publicKey as pointy_castle.ECPublicKey;
+      return EcPrivateKey(
+          x: bigIntToUInt8List(publicKey.Q!.x!.toBigInteger()!),
+          y: bigIntToUInt8List(publicKey.Q!.y!.toBigInteger()!),
+          d: bigIntToUInt8List(privateKey.d!),
+          curve: keyParameters.curve);
+    } else {
+      throw Exception();
+    }
   }
 
   pointy_castle.ECDomainParameters _getECDomainParameters(Curve curve) {
@@ -146,6 +157,8 @@ class PointyCastleCryptoProvider implements CryptoProvider {
         return pointy_castle.ECCurve_secp384r1();
       case Curve.p521:
         return pointy_castle.ECCurve_secp521r1();
+      case Curve.curve25519:
+        throw Exception('Curve not supported by this implementation.');
     }
   }
 
@@ -161,6 +174,8 @@ class PointyCastleCryptoProvider implements CryptoProvider {
         return pointy_castle.SHA512Digest();
       case SigningAlgorithm.ecdsaSha256KoblitzRecovery:
         return pointy_castle.SHA256Digest();
+      default:
+        throw Exception('Signing algorithm not supported by this implementation.');
     }
   }
 

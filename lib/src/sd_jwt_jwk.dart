@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:sd_jwt/src/crypto_provider/ed25519_edwards_crypto_provider.dart';
 import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_utils.dart';
@@ -20,6 +21,7 @@ enum KeyType {
   ec,
   rsa,
   okt,
+  okp,
 }
 
 extension KeyTypeNames on KeyType {
@@ -31,6 +33,8 @@ extension KeyTypeNames on KeyType {
         return 'RSA';
       case KeyType.okt:
         return 'oct';
+      case KeyType.okp:
+        return 'OKP';
     }
   }
 }
@@ -67,7 +71,32 @@ class Jwk {
       : keyType = KeyType.values.first,
         key = EcPrivateKey.generate(Curve.p256) {
     if (map['kty'] is String) {
-      if ((map['kty'] as String) == KeyType.ec.name) {
+      if ((map['kty'] as String) == KeyType.okp.name) {
+        keyType = KeyType.okp;
+        List<String> properties = ['x', 'crv'];
+        for (String property in properties) {
+          if (!map.containsKey(property)) {
+            throw Exception(
+                'Key could not be loaded. Property $property not found.');
+          }
+        }
+        Curve curve;
+        if (map['crv'] == Curve.curve25519.name) {
+          curve = Curve.curve25519;
+        } else {
+          throw Exception('Curve `${map['crv']} not supported.');
+        }
+        if (map['d'] == null) {
+          key = EdPublicKey(
+              pubA: base64.decode(addPaddingToBase64(map['x'])),
+              curve: curve);
+        } else {
+          key = EdPrivateKey(
+              pubA: base64.decode(addPaddingToBase64(map['x'])),
+              a: base64.decode(addPaddingToBase64(map['d'])),
+              curve: curve);
+        }
+      } else if ((map['kty'] as String) == KeyType.ec.name) {
         keyType = KeyType.ec;
         List<String> properties = ['x', 'y', 'crv'];
         for (String property in properties) {
@@ -92,13 +121,13 @@ class Jwk {
           key = EcPublicKey(
               x: base64.decode(addPaddingToBase64(map['x'])),
               y: base64.decode(addPaddingToBase64(map['y'])),
-              crv: curve);
+              curve: curve);
         } else {
           key = EcPrivateKey(
               x: base64.decode(addPaddingToBase64(map['x'])),
               y: base64.decode(addPaddingToBase64(map['y'])),
               d: base64.decode(addPaddingToBase64(map['d'])),
-              crv: curve);
+              curve: curve);
         }
       } else if ((map['kty'] as String) == KeyType.rsa.name) {
         keyType = KeyType.rsa;
@@ -166,6 +195,8 @@ class Jwk {
           algorithm = SigningAlgorithm.ecdsaSha384Prime;
         } else if (map['alg'] == SigningAlgorithm.ecdsaSha512Prime.name) {
           algorithm = SigningAlgorithm.ecdsaSha512Prime;
+        } else if (map['alg'] == SigningAlgorithm.eddsa25519Sha512.name) {
+          algorithm = SigningAlgorithm.eddsa25519Sha512;
         } else {
           throw Exception('Algorithm `${map['alg']}` not supported');
         }
@@ -247,13 +278,23 @@ class Jwk {
           removePaddingFromBase64(base64Url.encode((key as EcPrivateKey).y));
       map['d'] =
           removePaddingFromBase64(base64Url.encode((key as EcPrivateKey).d));
-      map['crv'] = (key as EcPrivateKey).crv.name;
+      map['crv'] = (key as EcPrivateKey).curve.name;
+
     } else if (key is EcPublicKey) {
       map['x'] =
           removePaddingFromBase64(base64Url.encode((key as EcPublicKey).x));
       map['y'] =
           removePaddingFromBase64(base64Url.encode((key as EcPublicKey).y));
-      map['crv'] = (key as EcPublicKey).crv.name;
+      map['crv'] = (key as EcPublicKey).curve.name;
+
+    } else if (key is EdPrivateKey) {
+      map['d'] = removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).a));
+      map['x'] = removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).pubA));
+      map['crv'] = (key as EdPublicKey).curve.name;
+
+    } else if (key is EdPublicKey) {
+      map['x'] = removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).pubA));
+      map['crv'] = (key as EdPublicKey).curve.name;
     }
 
     return map;
@@ -303,16 +344,16 @@ class RsaPrivateKey implements AsymmetricKey {
 }
 
 abstract class EcKey implements AsymmetricKey {
-  Curve crv;
+  Curve curve;
 
-  EcKey({required this.crv});
+  EcKey({required this.curve});
 }
 
 class EcPublicKey extends EcKey implements PublicKey {
   Uint8List x;
   Uint8List y;
 
-  EcPublicKey({required this.x, required this.y, required super.crv});
+  EcPublicKey({required this.x, required this.y, required super.curve});
 
   @override
   EcPublicKey get public => this;
@@ -325,18 +366,42 @@ class EcPrivateKey extends EcPublicKey implements PrivateKey {
       {required this.d,
       required super.x,
       required super.y,
-      required super.crv});
+      required super.curve});
 
   factory EcPrivateKey.generate(Curve curve) {
     PointyCastleCryptoProvider pointyCastleCryptoProvider =
         PointyCastleCryptoProvider();
-    return pointyCastleCryptoProvider.generateEcKeyPair(curve: curve)
+    return pointyCastleCryptoProvider.generateKeyPair(keyParameters: EcKeyParameters(curve))
         as EcPrivateKey;
   }
 
   @override
-  EcPublicKey get public => EcPublicKey(x: x, y: y, crv: crv);
+  EcPublicKey get public => EcPublicKey(x: x, y: y, curve: curve);
 
   @override
   Uint8List get private => d;
+}
+
+class EdPrivateKey extends EdPublicKey implements PrivateKey {
+  Uint8List a;
+
+  EdPrivateKey({required super.curve, required this.a, required super.pubA});
+
+  factory EdPrivateKey.generate({required Curve curve, Uint8List? seed}) {
+    Ed25519EdwardsCryptoProvider ed25519EdwardsCryptoProvider = Ed25519EdwardsCryptoProvider();
+    return ed25519EdwardsCryptoProvider.generateKeyPair(keyParameters: EcKeyParameters(curve), seed: seed) as EdPrivateKey;
+  }
+
+  @override
+  Uint8List get private => a;
+}
+
+class EdPublicKey extends EcKey implements PublicKey {
+  Uint8List pubA;
+
+  EdPublicKey({required super.curve, required this.pubA});
+
+  @override
+  // TODO: implement public
+  PublicKey get public => throw UnimplementedError();
 }

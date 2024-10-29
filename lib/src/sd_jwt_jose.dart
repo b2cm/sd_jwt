@@ -19,7 +19,23 @@ class JoseHeader {
     if (map['protected'] != null) {
       return JwsJoseHeader.fromJson(map);
     } else {
-      return JoseHeader.fromJson(map);
+      String? type;
+      String? contentType;
+      Map<String, dynamic> additionalUnprotected = {};
+      for(MapEntry entry in map.entries) {
+        if (entry.key == 'typ') {
+          type = entry.value;
+        } else if (entry.key == 'cty') {
+          contentType = entry.value;
+        } else {
+          additionalUnprotected[entry.key] = entry.value;
+        }
+      }
+      return JoseHeader(
+        type: type,
+        contentType: contentType,
+        additionalUnprotected: additionalUnprotected,
+      );
     }
   }
 
@@ -68,7 +84,7 @@ class JwsJoseHeader extends JoseHeader {
       : algorithm = map['protected']['alg'] != null
             ? SigningAlgorithm.values
                 .singleWhere((e) => e.name == map['protected']['alg'])
-            : throw Exception(),
+            : throw Exception('Algorithm ${map['protected']['alg']} not supported'),
         additionalProtected = {} {
     Map<String, dynamic> protected = map['protected'] ??= <String, dynamic>{};
     Map<String, dynamic> unprotected =

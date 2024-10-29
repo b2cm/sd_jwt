@@ -6,12 +6,12 @@ import 'package:sd_jwt/src/sd_jwt_jwk.dart';
 abstract class CryptoProvider {
   final String name = '';
 
-  AsymmetricKey generateEcKeyPair({required Curve curve});
+  Key generateKeyPair({required KeyParameters keyParameters});
 
   Uint8List digest(
       {required Uint8List data, required DigestAlgorithm algorithm});
 
-  FutureOr<Uint8List> sign(
+  FutureOr<Signature> sign(
       {required Uint8List data, required SigningAlgorithm algorithm});
 
   bool verify(
@@ -20,12 +20,24 @@ abstract class CryptoProvider {
       required Signature signature});
 }
 
+abstract class KeyParameters {}
+
+class EcKeyParameters implements KeyParameters {
+  Curve curve;
+  EcKeyParameters(this.curve);
+}
+
+class RsaKeyParameters implements KeyParameters {
+
+}
+
 enum SigningAlgorithm {
   ecdsaSha256Prime,
   ecdsaSha256Koblitz,
   ecdsaSha256KoblitzRecovery,
   ecdsaSha384Prime,
   ecdsaSha512Prime,
+  eddsa25519Sha512,
 }
 
 enum DigestAlgorithm { sha2_256, sha2_384, sha2_512, sha3_256 }
@@ -58,6 +70,8 @@ extension DigestAlgorithmName on SigningAlgorithm {
         return 'SHA-384';
       case SigningAlgorithm.ecdsaSha512Prime:
         return 'SHA-512';
+      case SigningAlgorithm.eddsa25519Sha512:
+        return 'SHA-512';
     }
   }
 }
@@ -74,6 +88,8 @@ extension DigestAlgorithmLength on SigningAlgorithm {
       case SigningAlgorithm.ecdsaSha384Prime:
         return 384;
       case SigningAlgorithm.ecdsaSha512Prime:
+        return 512;
+      case SigningAlgorithm.eddsa25519Sha512:
         return 512;
     }
   }
@@ -92,6 +108,8 @@ extension JWA on SigningAlgorithm {
         return 'ES384';
       case SigningAlgorithm.ecdsaSha512Prime:
         return 'ES512';
+      case SigningAlgorithm.eddsa25519Sha512:
+        return 'EdDSA';
     }
   }
 
@@ -107,6 +125,8 @@ extension JWA on SigningAlgorithm {
         return 'ECDSA using P-384 and SHA-384';
       case SigningAlgorithm.ecdsaSha512Prime:
         return 'ECDSA using P-521 and SHA-512';
+      case SigningAlgorithm.eddsa25519Sha512:
+        return 'EDDSA using Curve25519 and SHA-512';
     }
   }
 }
@@ -116,6 +136,7 @@ enum Curve {
   p256k,
   p384,
   p521,
+  curve25519,
 }
 
 extension CurveName on Curve {
@@ -129,6 +150,8 @@ extension CurveName on Curve {
         return 'P-384';
       case Curve.p521:
         return 'P-521';
+      case Curve.curve25519:
+        return 'Ed25519';
     }
   }
 
@@ -142,6 +165,8 @@ extension CurveName on Curve {
         return 384;
       case Curve.p521:
         return 521;
+      case Curve.curve25519:
+        return 256;
     }
   }
 }
