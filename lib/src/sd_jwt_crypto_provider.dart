@@ -14,7 +14,7 @@ abstract class CryptoProvider {
   FutureOr<Signature> sign(
       {required Uint8List data, required SigningAlgorithm algorithm});
 
-  bool verify(
+  FutureOr<bool> verify(
       {required Uint8List data,
       required SigningAlgorithm algorithm,
       required Signature signature});
@@ -27,9 +27,7 @@ class EcKeyParameters implements KeyParameters {
   EcKeyParameters(this.curve);
 }
 
-class RsaKeyParameters implements KeyParameters {
-
-}
+class RsaKeyParameters implements KeyParameters {}
 
 enum SigningAlgorithm {
   ecdsaSha256Prime,
@@ -171,13 +169,40 @@ extension CurveName on Curve {
   }
 }
 
-abstract class Signature {}
+abstract class Signature {
+  factory Signature.fromSignatureBytes(Uint8List bytes, SigningAlgorithm alg) {
+    if (alg.name.startsWith('ES') || alg.name.startsWith('Ed')) {
+      var s = bytes.length ~/ 2;
+
+      EcSignature ecSignature = EcSignature(
+          Uint8List.fromList(bytes.sublist(0, s)),
+          Uint8List.fromList(bytes.sublist(s)));
+
+      return ecSignature;
+    } else {
+      throw Exception('Unsupported Algorithm: ${alg.name}');
+    }
+  }
+
+  Uint8List toSignatureBytes();
+}
 
 class EcSignature implements Signature {
   Uint8List r;
   Uint8List s;
 
   EcSignature(this.r, this.s);
+
+  @override
+  Uint8List toSignatureBytes() {
+    return Uint8List.fromList(r + s);
+  }
 }
 
-class RsaSignature implements Signature {}
+class RsaSignature implements Signature {
+  @override
+  Uint8List toSignatureBytes() {
+    // TODO: implement toSignatureBytes
+    throw UnimplementedError();
+  }
+}

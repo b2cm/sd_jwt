@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:sd_jwt/sd_jwt.dart';
-import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -26,7 +25,7 @@ void main() {
     SdJws sdJws = await sdJwt.sign(
         signer: PointyCastleCryptoProvider(jwk.key as EcPrivateKey),
         signingAlgorithm: SigningAlgorithm.ecdsaSha256Koblitz);
-    SdJwt unverified = sdJws.unverified();
+    SdJwt unverified = sdJws.toSdJwt();
 
     print(json.encode(unverified));
 

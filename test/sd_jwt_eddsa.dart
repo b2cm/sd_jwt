@@ -1,5 +1,4 @@
 import 'package:sd_jwt/sd_jwt.dart';
-import 'package:sd_jwt/src/crypto_provider/ed25519_edwards_crypto_provider.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -16,7 +15,10 @@ void main() {
     print(jws.toCompactSerialization());
     print(jws.toJson());
     print(jws.jsonContent());
-    expect(jws.verify(jsonWebKey), true);
+    expect(
+        await jws.verify(
+            Ed25519EdwardsCryptoProvider(jsonWebKey.key as EdPrivateKey)),
+        true);
   });
 
   test('Export and Import', () async {

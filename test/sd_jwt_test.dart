@@ -1,6 +1,5 @@
 import 'package:jose/jose.dart';
 import 'package:sd_jwt/sd_jwt.dart';
-import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -23,11 +22,16 @@ void main() {
               Jwk.fromJson(jsonWebKey.toJson()).key as EcPrivateKey));
       print(sdJws.toCompactSerialization());
       print(sdJws.toJson());
+
       JsonWebSignature jsonWebSignature =
           JsonWebSignature.fromCompactSerialization(
               sdJws.toCompactSerialization().split('~').first);
       print(await jsonWebSignature.verify(jsonWebKeyStore));
       expect(await jsonWebSignature.verify(jsonWebKeyStore), isTrue);
+      expect(
+          sdJws.verify(PointyCastleCryptoProvider(
+              Jwk.fromJson(jsonWebKey.toJson()).key as EcPrivateKey)),
+          isTrue);
     });
 
     test('Sign with own key', () async {
@@ -51,6 +55,10 @@ void main() {
               sdJws.toCompactSerialization().split('~').first);
       print(await jsonWebSignature.verify(jsonWebKeyStore));
       expect(await jsonWebSignature.verify(jsonWebKeyStore), isTrue);
+      expect(
+          sdJws.verify(PointyCastleCryptoProvider(
+              Jwk.fromJson(jsonWebKey.toJson()).key as EcPrivateKey)),
+          isTrue);
     });
   });
 
@@ -245,6 +253,10 @@ Future<Jws> _generateSdJws(KeyType keyType, Curve curve,
       signer: PointyCastleCryptoProvider(jsonWebKey.key as EcPrivateKey));
   print(sdJws.toCompactSerialization());
   print(sdJws.toJson());
+  expect(
+      sdJws.verify(PointyCastleCryptoProvider(
+          Jwk.fromJson(jsonWebKey.toJson()).key as EcPrivateKey)),
+      isTrue);
   return sdJws;
 }
 

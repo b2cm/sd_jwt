@@ -60,9 +60,10 @@ class PointyCastleCryptoProvider implements CryptoProvider {
       // return bytes;
 
       return EcSignature(
-          Uint8List.fromList(bigIntToBytes(signature.r, length).toList().reversed.toList()),
-          Uint8List.fromList(bigIntToBytes(signature.s, length).toList().reversed.toList())
-      );
+          Uint8List.fromList(
+              bigIntToBytes(signature.r, length).toList().reversed.toList()),
+          Uint8List.fromList(
+              bigIntToBytes(signature.s, length).toList().reversed.toList()));
     }
     throw Exception('Key type not supported.');
   }
@@ -95,15 +96,8 @@ class PointyCastleCryptoProvider implements CryptoProvider {
 
       pointy_castle.Digest digest = _getDigest(algorithm);
 
-      int length = {
-        Curve.p256: 32,
-        Curve.p256k: 32,
-        Curve.p384: 48,
-        Curve.p521: 66
-      }[publicKey.curve]!;
-
       pointy_castle.ECDSASigner ecdsaSigner =
-          pointy_castle.ECDSASigner(digest, pointy_castle.HMac(digest, length));
+          pointy_castle.ECDSASigner(digest, null);
 
       ecdsaSigner.init(false, pointy_castle.PublicKeyParameter(key));
 
@@ -118,25 +112,24 @@ class PointyCastleCryptoProvider implements CryptoProvider {
 
   @override
   Key generateKeyPair({required KeyParameters keyParameters}) {
-
-    if(keyParameters is EcKeyParameters) {
+    if (keyParameters is EcKeyParameters) {
       keyParameters as EcKeyParameters;
       pointy_castle.ECDomainParameters ecDomainParameters =
-      _getECDomainParameters(keyParameters.curve);
+          _getECDomainParameters(keyParameters.curve);
 
       pointy_castle.ECKeyGenerator ecKeyGenerator =
-      pointy_castle.ECKeyGenerator();
+          pointy_castle.ECKeyGenerator();
 
       ecKeyGenerator.init(pointy_castle.ParametersWithRandom(
           pointy_castle.ECKeyGeneratorParameters(ecDomainParameters),
           DefaultSecureRandom()));
       pointy_castle
           .AsymmetricKeyPair<pointy_castle.PublicKey, pointy_castle.PrivateKey>
-      asymmetricKeyPair = ecKeyGenerator.generateKeyPair();
+          asymmetricKeyPair = ecKeyGenerator.generateKeyPair();
       pointy_castle.ECPrivateKey privateKey =
-      asymmetricKeyPair.privateKey as pointy_castle.ECPrivateKey;
+          asymmetricKeyPair.privateKey as pointy_castle.ECPrivateKey;
       pointy_castle.ECPublicKey publicKey =
-      asymmetricKeyPair.publicKey as pointy_castle.ECPublicKey;
+          asymmetricKeyPair.publicKey as pointy_castle.ECPublicKey;
       return EcPrivateKey(
           x: bigIntToUInt8List(publicKey.Q!.x!.toBigInteger()!),
           y: bigIntToUInt8List(publicKey.Q!.y!.toBigInteger()!),
@@ -175,7 +168,8 @@ class PointyCastleCryptoProvider implements CryptoProvider {
       case SigningAlgorithm.ecdsaSha256KoblitzRecovery:
         return pointy_castle.SHA256Digest();
       default:
-        throw Exception('Signing algorithm not supported by this implementation.');
+        throw Exception(
+            'Signing algorithm not supported by this implementation.');
     }
   }
 

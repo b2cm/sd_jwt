@@ -13,7 +13,7 @@ void main() {
 
       expect(disclosed.disclosures!.length, 1);
 
-      var sdJwt = disclosed.unverified();
+      var sdJwt = disclosed.toSdJwt();
 
       expect(sdJwt.claims.containsKey('birthdate'), isTrue);
     });
@@ -23,7 +23,7 @@ void main() {
 
       expect(disclosed.disclosures!.length, 2);
 
-      var sdJwt = disclosed.unverified();
+      var sdJwt = disclosed.toSdJwt();
 
       expect(sdJwt.claims.containsKey('address'), isTrue);
       Map address = sdJwt.claims['address'];
@@ -36,7 +36,7 @@ void main() {
 
       expect(disclosed.disclosures!.length, 6);
 
-      var sdJwt = disclosed.unverified();
+      var sdJwt = disclosed.toSdJwt();
 
       expect(sdJwt.claims.containsKey('address'), isTrue);
       Map address = sdJwt.claims['address'];
@@ -58,7 +58,7 @@ void main() {
 
       expect(disclosed.disclosures!.length, 1);
 
-      var sdJwt = disclosed.unverified();
+      var sdJwt = disclosed.toSdJwt();
 
       expect(sdJwt.claims.containsKey('given_name'), isTrue);
     });
@@ -68,7 +68,7 @@ void main() {
 
       expect(disclosed.disclosures!.length, 1);
 
-      var sdJwt = disclosed.unverified();
+      var sdJwt = disclosed.toSdJwt();
 
       expect(sdJwt.claims.containsKey('address'), isTrue);
       Map address = sdJwt.claims['address'];
@@ -81,7 +81,7 @@ void main() {
 
       expect(disclosed.disclosures!.length, 5);
 
-      var sdJwt = disclosed.unverified();
+      var sdJwt = disclosed.toSdJwt();
 
       expect(sdJwt.claims.containsKey('address'), isTrue);
       Map address = sdJwt.claims['address'];
@@ -100,7 +100,7 @@ void main() {
 
       expect(disclosed.disclosures!.length, 1);
 
-      var sdJwt = disclosed.unverified();
+      var sdJwt = disclosed.toSdJwt();
 
       expect(sdJwt.claims.containsKey('address'), isTrue);
       Map address = sdJwt.claims['address'];

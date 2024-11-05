@@ -74,26 +74,11 @@ class SdJwt extends Jwt {
     alwaysDisclosed != null ? _alwaysDisclosed = alwaysDisclosed : null;
   }
 
-  SdJwt.verified(SdJws sdJws, Jwk jsonWebKey)
+  SdJwt.fromSdJws(SdJws sdJws)
       : _digestAlgorithm = DigestAlgorithm.values.singleWhere((e) =>
             e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
         decoyFactor = DecoyFactor.none,
-        super.verified(sdJws, jsonWebKey) {
-    claims.remove('_sd_alg');
-
-    if (sdJws.disclosures != null) {
-      _disclosures = _deepCopyMap(claims);
-      _disclosures = _restoreDisclosuresMap(_disclosures, sdJws.disclosures!);
-      claims = _deepCopyMap(_disclosures);
-      claims = _restoreClaimsMap(claims);
-    }
-  }
-
-  SdJwt.unverified(SdJws sdJws)
-      : _digestAlgorithm = DigestAlgorithm.values.singleWhere((e) =>
-            e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
-        decoyFactor = DecoyFactor.none,
-        super.unverified(sdJws) {
+        super.fromJws(sdJws) {
     claims.remove('_sd_alg');
 
     if (sdJws.disclosures != null) {
@@ -655,39 +640,7 @@ class Jwt {
     _removeRegisteredClaims();
   }
 
-  Jwt.verified(Jws jsonWebSignature, Jwk jsonWebKey)
-      : claims = Map.of(json.decode(utf8.decode(jsonWebSignature.payload))),
-        _header = JwsJoseHeader.fromJson({
-          'protected': json.decode(utf8.decode(jsonWebSignature.protected)),
-          'unprotected': jsonWebSignature.header
-        }) {
-    Uint8List signature = jsonWebSignature.signature;
-    Uint8List verificationInput = RFC7515.verificationInput(
-        payload: jsonWebSignature.payload,
-        protectedHeader: jsonWebSignature.protected);
-
-    if (jsonWebKey.keyType == KeyType.ec) {
-      PointyCastleCryptoProvider pointyCastleCryptoProvider =
-          PointyCastleCryptoProvider(jsonWebKey.key as EcPublicKey);
-
-      EcSignature ecSignature = EcSignature(
-          Uint8List.fromList(signature.getRange(0, 32).toList()),
-          Uint8List.fromList(signature.getRange(32, 64).toList()));
-
-      if (pointyCastleCryptoProvider.verify(
-          data: verificationInput,
-          algorithm: (_header as JwsJoseHeader).algorithm,
-          signature: ecSignature)) {
-        _isVerified = true;
-        _parseRegisteredClaims();
-        _removeRegisteredClaims();
-      } else {
-        throw Exception('Verification failed.');
-      }
-    }
-  }
-
-  Jwt.unverified(Jws jsonWebSignature)
+  Jwt.fromJws(Jws jsonWebSignature)
       : claims = Map.of(json.decode(utf8.decode(jsonWebSignature.payload))),
         _header = JwsJoseHeader.fromJson({
           'protected': json.decode(utf8.decode(jsonWebSignature.protected)),
@@ -695,6 +648,21 @@ class Jwt {
         }) {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
+  }
+
+  FutureOr<bool> verify(Jws jsonWebSignature, CryptoProvider verifier) {
+    Uint8List signature = jsonWebSignature.signature;
+    Uint8List verificationInput = RFC7515.verificationInput(
+        payload: jsonWebSignature.payload,
+        protectedHeader: jsonWebSignature.protected);
+
+    var sig = Signature.fromSignatureBytes(
+        signature, (_header as JwsJoseHeader).algorithm);
+
+    return verifier.verify(
+        data: verificationInput,
+        algorithm: (_header).algorithm,
+        signature: sig);
   }
 
   FutureOr<Jws> sign(
@@ -726,15 +694,12 @@ class Jwt {
     Uint8List signingInput = RFC7515.signingInput(
         protectedHeader: jwsHeader.protected, payload: payload);
 
-    // TODO Support for another signature types than EC
-    EcSignature signature =
-        await signer.sign(data: signingInput, algorithm: signingAlgorithm) as EcSignature;
-
-    Uint8List signatureBytes = Uint8List.fromList(signature.r + signature.s);
+    Signature signature =
+        await signer.sign(data: signingInput, algorithm: signingAlgorithm);
 
     return Jws(
       payload: RFC7515.bytes(payload),
-      signature: signatureBytes,
+      signature: signature.toSignatureBytes(),
       header: jwsHeader.unprotected,
       protected: RFC7515.bytes(jwsHeader.protected),
     );
@@ -1433,11 +1398,11 @@ class KbJwt extends Jwt {
     issuedAt ??= DateTime.now();
   }
 
-  KbJwt.verified(super.jsonWebSignature, super.jsonWebKey)
+  KbJwt.fromJws(super.jsonWebSignature)
       : sdHash = base64Url.decode(
             json.decode(utf8.decode(jsonWebSignature.payload))['sd_hash']),
         nonce = json.decode(utf8.decode(jsonWebSignature.payload))['nonce'],
-        super.verified();
+        super.fromJws();
 
   @override
   FutureOr<KbJws> sign(

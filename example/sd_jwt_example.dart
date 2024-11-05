@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:json_path/json_path.dart';
 import 'package:sd_jwt/sd_jwt.dart';
-import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 
 Future<void> main() async {
   // At first, you need some key material for signing and verification tasks.
@@ -19,7 +18,9 @@ Future<void> main() async {
 
   // Otherwise, you can use internal data structures to handle keys:
 
-  issuerJwk = Jwk(keyType: KeyType.ec, key: EcPrivateKey.generate(Curve.p256));
+  issuerJwk = Jwk(keyType: KeyType.ec, key: EcPrivateKey.generate(Curve.p521));
+  var issuerCryptoProvider =
+      PointyCastleCryptoProvider(issuerJwk.key as EcPrivateKey);
 
   // Now, let's create a SD-JWT. Registered claims names by RFC 7519 are parsed
   // and removed from claims set or can be set directly:
@@ -74,8 +75,8 @@ Future<void> main() async {
   // Sign the SD-JWT and send the resulting SD-JWS to the holder
 
   SdJws awesomeSigned = await awesome.sign(
-      signer: holderCryptoProvider,
-      signingAlgorithm: SigningAlgorithm.ecdsaSha256Prime);
+      signer: issuerCryptoProvider,
+      signingAlgorithm: SigningAlgorithm.ecdsaSha512Prime);
 
   String awesomeSignedCompact = awesomeSigned.toCompactSerialization();
 
@@ -115,17 +116,17 @@ Future<void> main() async {
       SdJws.fromCompactSerialization(awesomePresentationCompact);
 
   SdJwt awesomeVerified;
-  KbJwt kbJwtVerified;
-  try {
-    awesomeVerified = awesomePresentation.verified(issuerJwk.public);
-  } on Exception catch (e) {
-    print('SD-JWS: $e');
-    return;
-  }
+  KbJwt kbJwtParsed;
+
+  var verified = await awesomePresentation.verify(issuerCryptoProvider);
+  print('Presentation: $verified');
+  awesomeVerified = awesomePresentation.toSdJwt();
 
   try {
-    kbJwtVerified = awesomePresentation.keyBindingJws!
-        .verified((awesomeVerified.confirmation as JwkConfirmation).jwk.public);
+    var kbJwtVerified =
+        awesomePresentation.keyBindingJws!.verify(holderCryptoProvider);
+    print('KB-JWS: $kbJwtVerified');
+    kbJwtParsed = awesomePresentation.keyBindingJws!.toKbJwt();
   } on Exception catch (e) {
     print('KB-JWS: $e');
     return;
@@ -136,7 +137,7 @@ Future<void> main() async {
 // of the `sd_hash` (sdHash) property matches the specified digest of the SD-JWS:
 
   print(base64.encode(awesomePresentation.digest) ==
-      base64.encode(kbJwtVerified.sdHash));
+      base64.encode(kbJwtParsed.sdHash));
 
   print(json.encode(awesomeVerified));
 }

@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:json_path/json_path.dart';
 import 'package:sd_jwt/sd_jwt.dart';
-import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_utils.dart';
 
 class SdJws extends Jws {
@@ -117,7 +116,7 @@ class SdJws extends Jws {
       return this;
     }
 
-    var sdJwt = unverified();
+    var sdJwt = toSdJwt();
     List<String> disclosureKeys = [];
     List<String> disclosureSalts = []; // Used for list elements
 
@@ -191,22 +190,7 @@ class SdJws extends Jws {
   }
 
   @override
-  bool verify(Jwk jsonWebKey) {
-    try {
-      SdJwt.verified(this, jsonWebKey);
-      return true;
-    } on Exception {
-      return false;
-    }
-  }
-
-  @override
-  SdJwt verified(Jwk jsonWebKey) {
-    return SdJwt.verified(this, jsonWebKey);
-  }
-
-  @override
-  SdJwt unverified() => SdJwt.unverified(this);
+  SdJwt toSdJwt() => SdJwt.fromSdJws(this);
 
   Uint8List get digest {
     String compactSerialization = super.toCompactSerialization();
@@ -366,21 +350,15 @@ class Jws {
         'signature': signature,
       };
 
+  FutureOr<bool> verify(CryptoProvider verifier) {
+    var jwt = toJwt();
+    return jwt.verify(this, verifier);
+  }
+
   @override
   String toString() => toJson().toString();
 
-  bool verify(Jwk jsonWebKey) {
-    try {
-      Jwt.verified(this, jsonWebKey);
-      return true;
-    } on Exception {
-      return false;
-    }
-  }
-
-  Jwt verified(Jwk jsonWebKey) => Jwt.verified(this, jsonWebKey);
-
-  Jwt unverified() => Jwt.unverified(this);
+  Jwt toJwt() => Jwt.fromJws(this);
 }
 
 class KbJws extends Jws {
@@ -407,8 +385,7 @@ class KbJws extends Jws {
     );
   }
 
-  @override
-  KbJwt verified(Jwk jsonWebKey) {
-    return KbJwt.verified(this, jsonWebKey);
+  KbJwt toKbJwt() {
+    return KbJwt.fromJws(this);
   }
 }
