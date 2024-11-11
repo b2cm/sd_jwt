@@ -189,7 +189,6 @@ class SdJws extends Jws {
         disclosures: Disclosures.fromBytes(foundDisclosures));
   }
 
-  @override
   SdJwt toSdJwt() => SdJwt.fromSdJws(this);
 
   Uint8List get digest {

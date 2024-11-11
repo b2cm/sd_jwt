@@ -35,11 +35,12 @@ void main() {
     expect(unverified.payload['sub'], '6c5c0a49-b589-431d-bae7-219122a9ec2c');
     expect(unverified.payload['_sd_alg'], 'sha-256');
 
-    print(json.encode(unverified.claims));
+    print(json.encode(unverified.additionalClaims));
 
-    expect(unverified.claims['address']['street_address'], 'Schulstr. 12');
-    expect(unverified.claims['address']['locality'], 'Schulpforta');
-    expect(unverified.claims['address']['region'], 'Sachsen-Anhalt');
-    expect(unverified.claims['address']['country'], 'DE');
+    expect(unverified.additionalClaims?['address']['street_address'],
+        'Schulstr. 12');
+    expect(unverified.additionalClaims?['address']['locality'], 'Schulpforta');
+    expect(unverified.additionalClaims?['address']['region'], 'Sachsen-Anhalt');
+    expect(unverified.additionalClaims?['address']['country'], 'DE');
   });
 }

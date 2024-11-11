@@ -12,7 +12,7 @@ void main() {
       JsonWebKeyStore jsonWebKeyStore = JsonWebKeyStore();
       JsonWebKey jsonWebKey = JsonWebKey.generate(JsonWebAlgorithm.es256k.name);
       jsonWebKeyStore.addKey(jsonWebKey);
-      var awesome = Jwt(claims: {
+      var awesome = Jwt(additionalClaims: {
         'vc': 'VerifiableCredential'
         // }, jsonWebKey: Jwk.fromJson(jsonWebKey.toJson()));
       });
@@ -41,7 +41,7 @@ void main() {
           key: EcPrivateKey.generate(Curve.p256k),
           algorithm: SigningAlgorithm.ecdsaSha256Koblitz);
       jsonWebKeyStore.addKey(JsonWebKey.fromJson(jsonWebKey.toJson()));
-      var awesome = Jwt(claims: {
+      var awesome = Jwt(additionalClaims: {
         'vc': 'VerifiableCredential'
         // }, jsonWebKey: Jwk.fromJson(jsonWebKey.toJson()));
       });
@@ -247,7 +247,7 @@ Future<Jws> _generateSdJws(KeyType keyType, Curve curve,
       key: EcPrivateKey.generate(curve),
       algorithm: algorithm);
   jsonWebKeyStore.addKey(JsonWebKey.fromJson(jsonWebKey.toJson()));
-  var awesome = Jwt(claims: {'vc': 'VerifiableCredential'});
+  var awesome = Jwt(additionalClaims: {'vc': 'VerifiableCredential'});
   Jws sdJws = await awesome.sign(
       signingAlgorithm: algorithm,
       signer: PointyCastleCryptoProvider(jsonWebKey.key as EcPrivateKey));

@@ -52,7 +52,7 @@ class SdJwt extends Jwt {
   }
 
   SdJwt({
-    required super.claims,
+    required Map<String, dynamic> claims,
     Map<String, dynamic>? alwaysDisclosed,
     SaltAlgorithm saltAlgorithm = SaltAlgorithm.randomBase64UrlNoPadding256,
     DigestAlgorithm digestAlgorithm = DigestAlgorithm.sha2_256,
@@ -67,10 +67,11 @@ class SdJwt extends Jwt {
     this.decoyFactor = DecoyFactor.none,
   })  : _saltAlgorithm = saltAlgorithm,
         _digestAlgorithm = digestAlgorithm {
+    super.additionalClaims = _deepCopyMap(claims);
     _parseRegisteredClaims();
     _removeRegisteredClaims();
-    _disclosures =
-        _createDisclosuresMap(super.claims, saltAlgorithm, digestAlgorithm);
+    _disclosures = _createDisclosuresMap(
+        super.additionalClaims!, saltAlgorithm, digestAlgorithm);
     alwaysDisclosed != null ? _alwaysDisclosed = alwaysDisclosed : null;
   }
 
@@ -79,13 +80,13 @@ class SdJwt extends Jwt {
             e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
         decoyFactor = DecoyFactor.none,
         super.fromJws(sdJws) {
-    claims.remove('_sd_alg');
+    additionalClaims?.remove('_sd_alg');
 
     if (sdJws.disclosures != null) {
-      _disclosures = _deepCopyMap(claims);
+      _disclosures = _deepCopyMap(additionalClaims ?? {});
       _disclosures = _restoreDisclosuresMap(_disclosures, sdJws.disclosures!);
-      claims = _deepCopyMap(_disclosures);
-      claims = _restoreClaimsMap(claims);
+      additionalClaims = _deepCopyMap(_disclosures);
+      additionalClaims = _restoreClaimsMap(additionalClaims ?? {});
     }
   }
 
@@ -100,11 +101,11 @@ class SdJwt extends Jwt {
               ? Disclosure.fromJson(e)
               : throw Exception('${e.runtimeType} not supported.'))
           .toList();
-      _disclosures = _deepCopyMap(claims);
+      _disclosures = _deepCopyMap(additionalClaims ?? {});
       _disclosures =
           _restoreDisclosuresMap(_disclosures, Disclosures(disclosuresList));
-      claims = _deepCopyMap(_disclosures);
-      claims = _restoreClaimsMap(claims);
+      additionalClaims = _deepCopyMap(_disclosures);
+      additionalClaims = _restoreClaimsMap(additionalClaims ?? {});
     }
   }
 
@@ -128,8 +129,8 @@ class SdJwt extends Jwt {
       SigningAlgorithm? signingAlgorithm}) async {
     List<Disclosure> disclosuresList = [];
     _getDisclosuresMap(_disclosures, disclosuresList);
-    Jws jws =
-        await super.sign(signer: signer, signingAlgorithm: signingAlgorithm);
+    Jws jws = await super.sign(
+        signer: signer, header: header, signingAlgorithm: signingAlgorithm);
     return SdJws(
       payload: jws.payload,
       signature: jws.signature,
@@ -573,7 +574,7 @@ class SdJwt extends Jwt {
 }
 
 class Jwt {
-  Map<String, dynamic> claims;
+  Map<String, dynamic>? additionalClaims;
   String? issuer;
   String? subject;
   String? audience;
@@ -582,7 +583,6 @@ class Jwt {
   DateTime? issuedAt;
   String? jwtId;
   Confirmation? confirmation;
-  bool _isVerified = false;
   final JoseHeader _header;
   static final List<String> _registeredClaimNames = [
     'iss',
@@ -594,12 +594,12 @@ class Jwt {
     'jti'
   ];
 
-  bool get isVerified => _isVerified;
-
   JoseHeader get header => _header;
 
   Map<String, dynamic> get payload {
-    Map<String, dynamic> map = Map<String, dynamic>.of(claims);
+    Map<String, dynamic> map = additionalClaims == null
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.of(additionalClaims!);
     issuer != null ? map['iss'] = issuer : null;
     subject != null ? map['sub'] = subject : null;
     audience != null ? map['aud'] = audience : null;
@@ -618,7 +618,8 @@ class Jwt {
   }
 
   Jwt(
-      {required Map<String, dynamic> claims,
+      {this.confirmation,
+      this.additionalClaims,
       this.issuer,
       this.subject,
       this.audience,
@@ -627,25 +628,23 @@ class Jwt {
       this.issuedAt,
       this.jwtId,
       JoseHeader? header})
-      : _header = header ??= JoseHeader(),
-        claims = Map.of(claims) {
+      : _header = header ??= JoseHeader() {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
   }
 
   Jwt.fromJson(Map<String, dynamic> map)
-      : claims = Map.of(map['payload']),
+      : additionalClaims = Map.of(map['payload']),
         _header = JoseHeader.fromJson(map['header']) {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
   }
 
   Jwt.fromJws(Jws jsonWebSignature)
-      : claims = Map.of(json.decode(utf8.decode(jsonWebSignature.payload))),
-        _header = JwsJoseHeader.fromJson({
-          'protected': json.decode(utf8.decode(jsonWebSignature.protected)),
-          'unprotected': jsonWebSignature.header
-        }) {
+      : additionalClaims =
+            Map.of(json.decode(utf8.decode(jsonWebSignature.payload))),
+        _header = JoseHeader.fromJson(
+            json.decode(utf8.decode(jsonWebSignature.protected))) {
     _parseRegisteredClaims();
     _removeRegisteredClaims();
   }
@@ -682,17 +681,16 @@ class Jwt {
       jwsHeader = _header;
     } else {
       jwsHeader = JwsJoseHeader(
-          algorithm: signingAlgorithm,
-          type: _header.type,
-          contentType: _header.contentType,
-          additionalUnprotected: _header.additionalUnprotected,
-          additionalProtected: null);
+        algorithm: signingAlgorithm,
+        type: _header.type,
+        contentType: _header.contentType,
+      );
     }
 
     Map<String, dynamic> payload = Map.of(this.payload);
 
     Uint8List signingInput = RFC7515.signingInput(
-        protectedHeader: jwsHeader.protected, payload: payload);
+        protectedHeader: jwsHeader.toJson(), payload: payload);
 
     Signature signature =
         await signer.sign(data: signingInput, algorithm: signingAlgorithm);
@@ -700,8 +698,8 @@ class Jwt {
     return Jws(
       payload: RFC7515.bytes(payload),
       signature: signature.toSignatureBytes(),
-      header: jwsHeader.unprotected,
-      protected: RFC7515.bytes(jwsHeader.protected),
+      header: {},
+      protected: RFC7515.bytes(jwsHeader.toJson()),
     );
   }
 
@@ -714,56 +712,59 @@ class Jwt {
   String toString() => toJson().toString();
 
   void _parseRegisteredClaims() {
-    if (subject == null && claims['sub'] != null) {
-      subject = claims['sub'];
+    if (subject == null && additionalClaims?['sub'] != null) {
+      subject = additionalClaims!['sub'];
     }
-    if (issuer == null && claims['iss'] != null) {
-      issuer = claims['iss'];
+    if (issuer == null && additionalClaims?['iss'] != null) {
+      issuer = additionalClaims!['iss'];
     }
-    if (audience == null && claims['aud'] != null) {
-      audience = claims['aud'];
+    if (audience == null && additionalClaims?['aud'] != null) {
+      audience = additionalClaims!['aud'];
     }
-    if (expirationTime == null && claims['exp'] != null) {
+    if (expirationTime == null && additionalClaims?['exp'] != null) {
       try {
-        expirationTime =
-            DateTime.fromMillisecondsSinceEpoch(claims['exp'] * 1000);
+        expirationTime = DateTime.fromMillisecondsSinceEpoch(
+            additionalClaims!['exp'] * 1000);
       } on Exception {
         rethrow;
       }
     }
-    if (notBefore == null && claims['nbf'] != null) {
+    if (notBefore == null && additionalClaims?['nbf'] != null) {
       try {
-        notBefore = DateTime.fromMillisecondsSinceEpoch(claims['nbf'] * 1000);
+        notBefore = DateTime.fromMillisecondsSinceEpoch(
+            additionalClaims!['nbf'] * 1000);
       } on Exception {
         rethrow;
       }
     }
-    if (issuedAt == null && claims['iat'] != null) {
+    if (issuedAt == null && additionalClaims?['iat'] != null) {
       try {
-        issuedAt = DateTime.fromMillisecondsSinceEpoch(claims['iat'] * 1000);
+        issuedAt = DateTime.fromMillisecondsSinceEpoch(
+            additionalClaims!['iat'] * 1000);
       } on Exception {
         rethrow;
       }
     }
-    if (jwtId == null && claims['jti'] != null) {
-      jwtId = claims['jti'];
+    if (jwtId == null && additionalClaims?['jti'] != null) {
+      jwtId = additionalClaims!['jti'];
     }
-    if (confirmation == null && claims['cnf'] != null) {
-      if (claims['cnf'] is Map && (claims['cnf'] as Map).containsKey('jwk')) {
-        confirmation = JwkConfirmation.fromJson(claims['cnf']);
+    if (confirmation == null && additionalClaims?['cnf'] != null) {
+      if (additionalClaims!['cnf'] is Map &&
+          (additionalClaims!['cnf'] as Map).containsKey('jwk')) {
+        confirmation = JwkConfirmation.fromJson(additionalClaims!['cnf']);
       }
     }
   }
 
   void _removeRegisteredClaims() {
-    claims.remove('sub');
-    claims.remove('iss');
-    claims.remove('aud');
-    claims.remove('exp');
-    claims.remove('nbf');
-    claims.remove('iat');
-    claims.remove('jti');
-    claims.remove('cnf');
+    additionalClaims?.remove('sub');
+    additionalClaims?.remove('iss');
+    additionalClaims?.remove('aud');
+    additionalClaims?.remove('exp');
+    additionalClaims?.remove('nbf');
+    additionalClaims?.remove('iat');
+    additionalClaims?.remove('jti');
+    additionalClaims?.remove('cnf');
   }
 }
 
@@ -1394,7 +1395,7 @@ class KbJwt extends Jwt {
       required super.issuedAt,
       required this.nonce,
       required this.sdHash})
-      : super(claims: {}) {
+      : super() {
     issuedAt ??= DateTime.now();
   }
 

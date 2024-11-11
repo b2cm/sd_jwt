@@ -15,7 +15,7 @@ void main() {
 
       var sdJwt = disclosed.toSdJwt();
 
-      expect(sdJwt.claims.containsKey('birthdate'), isTrue);
+      expect(sdJwt.additionalClaims?.containsKey('birthdate'), isTrue);
     });
 
     test('disclose attribute from nested object', () {
@@ -25,8 +25,8 @@ void main() {
 
       var sdJwt = disclosed.toSdJwt();
 
-      expect(sdJwt.claims.containsKey('address'), isTrue);
-      Map address = sdJwt.claims['address'];
+      expect(sdJwt.additionalClaims?.containsKey('address'), isTrue);
+      Map address = sdJwt.additionalClaims?['address'];
 
       expect(address.containsKey('street_address'), isTrue);
     });
@@ -38,8 +38,8 @@ void main() {
 
       var sdJwt = disclosed.toSdJwt();
 
-      expect(sdJwt.claims.containsKey('address'), isTrue);
-      Map address = sdJwt.claims['address'];
+      expect(sdJwt.additionalClaims?.containsKey('address'), isTrue);
+      Map address = sdJwt.additionalClaims?['address'];
 
       expect(address.containsKey('street_address'), isTrue);
       expect(address.containsKey('postal_code'), isTrue);
@@ -60,7 +60,7 @@ void main() {
 
       var sdJwt = disclosed.toSdJwt();
 
-      expect(sdJwt.claims.containsKey('given_name'), isTrue);
+      expect(sdJwt.additionalClaims?.containsKey('given_name'), isTrue);
     });
 
     test('disclose attribute from nested object', () {
@@ -70,8 +70,8 @@ void main() {
 
       var sdJwt = disclosed.toSdJwt();
 
-      expect(sdJwt.claims.containsKey('address'), isTrue);
-      Map address = sdJwt.claims['address'];
+      expect(sdJwt.additionalClaims?.containsKey('address'), isTrue);
+      Map address = sdJwt.additionalClaims?['address'];
 
       expect(address.containsKey('street_address'), isTrue);
     });
@@ -83,8 +83,8 @@ void main() {
 
       var sdJwt = disclosed.toSdJwt();
 
-      expect(sdJwt.claims.containsKey('address'), isTrue);
-      Map address = sdJwt.claims['address'];
+      expect(sdJwt.additionalClaims?.containsKey('address'), isTrue);
+      Map address = sdJwt.additionalClaims?['address'];
 
       expect(address.containsKey('street_address'), isTrue);
       expect(address.containsKey('locality'), isTrue);
@@ -102,8 +102,8 @@ void main() {
 
       var sdJwt = disclosed.toSdJwt();
 
-      expect(sdJwt.claims.containsKey('address'), isTrue);
-      Map address = sdJwt.claims['address'];
+      expect(sdJwt.additionalClaims?.containsKey('address'), isTrue);
+      Map address = sdJwt.additionalClaims?['address'];
 
       expect(address.containsKey('country'), isTrue);
 

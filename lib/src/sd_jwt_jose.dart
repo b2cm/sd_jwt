@@ -5,53 +5,7 @@ import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_jwk.dart';
 
 class JoseHeader {
-  String? type;
-  String? contentType;
-  Map<String, dynamic> additionalUnprotected;
-
-  JoseHeader(
-      {this.type,
-      this.contentType,
-      Map<String, dynamic>? additionalUnprotected})
-      : additionalUnprotected = additionalUnprotected ?? <String, dynamic>{};
-
-  factory JoseHeader.fromJson(Map<String, dynamic> map) {
-    if (map['protected'] != null) {
-      return JwsJoseHeader.fromJson(map);
-    } else {
-      String? type;
-      String? contentType;
-      Map<String, dynamic> additionalUnprotected = {};
-      for(MapEntry entry in map.entries) {
-        if (entry.key == 'typ') {
-          type = entry.value;
-        } else if (entry.key == 'cty') {
-          contentType = entry.value;
-        } else {
-          additionalUnprotected[entry.key] = entry.value;
-        }
-      }
-      return JoseHeader(
-        type: type,
-        contentType: contentType,
-        additionalUnprotected: additionalUnprotected,
-      );
-    }
-  }
-
-  Map<String, dynamic> toJson() {
-    Map<String, dynamic> map = {...additionalUnprotected};
-    type != null ? map['typ'] = type : null;
-    contentType != null ? map['cty'] = contentType : null;
-    return map;
-  }
-
-  @override
-  String toString() => toJson().toString();
-}
-
-class JwsJoseHeader extends JoseHeader {
-  SigningAlgorithm algorithm;
+  String? type, contentType;
   Uri? jwkSetUri;
   Jwk? jsonWebKey;
   String? keyId;
@@ -60,12 +14,11 @@ class JwsJoseHeader extends JoseHeader {
   Uint8List? x509certificateSha1;
   Uint8List? x509certificateSha256;
   List<String>? critical;
-  Map<String, dynamic> additionalProtected;
+  Map<String, dynamic>? additionalParameters;
 
-  JwsJoseHeader(
-      {required this.algorithm,
-      super.type,
-      super.contentType,
+  JoseHeader(
+      {this.type,
+      this.contentType,
       this.jwkSetUri,
       this.jsonWebKey,
       this.keyId,
@@ -74,23 +27,21 @@ class JwsJoseHeader extends JoseHeader {
       this.x509certificateSha1,
       this.x509certificateSha256,
       this.critical,
-      Map<String, dynamic>? additionalProtected,
-      Map<String, dynamic>? additionalUnprotected})
-      : additionalProtected = additionalProtected ?? <String, dynamic>{} {
-    super.additionalUnprotected = additionalUnprotected ?? <String, dynamic>{};
-  }
+      this.additionalParameters});
 
-  JwsJoseHeader.fromJson(Map<String, dynamic> map)
-      : algorithm = map['protected']['alg'] != null
-            ? SigningAlgorithm.values
-                .singleWhere((e) => e.name == map['protected']['alg'])
-            : throw Exception('Algorithm ${map['protected']['alg']} not supported'),
-        additionalProtected = {} {
-    Map<String, dynamic> protected = map['protected'] ??= <String, dynamic>{};
-    Map<String, dynamic> unprotected =
-        map['unprotected'] ??= <String, dynamic>{};
-
-    for (MapEntry entry in protected.entries) {
+  factory JoseHeader.fromJson(Map<String, dynamic> map) {
+    String? type, contentType;
+    Uri? jwkSetUri;
+    Jwk? jsonWebKey;
+    String? keyId;
+    Uri? x509certificateUri;
+    List<Uint8List>? x509certificateChain;
+    Uint8List? x509certificateSha1;
+    Uint8List? x509certificateSha256;
+    List<String>? critical;
+    SigningAlgorithm? alg;
+    Map<String, dynamic>? additionalParameters;
+    for (MapEntry entry in map.entries) {
       if (entry.key == 'jku') {
         jwkSetUri = Uri.tryParse(entry.value);
       } else if (entry.key == 'jwk') {
@@ -108,30 +59,58 @@ class JwsJoseHeader extends JoseHeader {
         x509certificateSha256 = base64Url.decode(entry.value);
       } else if (entry.key == 'crit') {
         critical = entry.value;
+      } else if (entry.key == 'typ') {
+        type = entry.value;
+      } else if (entry.key == 'cty') {
+        contentType = entry.value;
+      } else if (entry.key == 'alg') {
+        alg = map['alg'] != null
+            ? SigningAlgorithm.values.singleWhere((e) => e.name == map['alg'])
+            : throw Exception('Algorithm ${map['alg']} not supported');
       } else {
-        additionalProtected[entry.key] = entry.value;
+        additionalParameters ??= {};
+        additionalParameters[entry.key] = entry.value;
       }
     }
 
-    for (MapEntry entry in unprotected.entries) {
-      if (entry.key == 'typ') {
-        super.type = entry.value;
-      } else if (entry.key == 'cty') {
-        super.contentType = entry.value;
-      } else {
-        additionalUnprotected[entry.key] = entry.value;
-      }
+    if (additionalParameters != null && additionalParameters.isEmpty) {
+      additionalParameters = null;
+    }
+
+    if (alg == null) {
+      return JoseHeader(
+          type: type,
+          keyId: keyId,
+          additionalParameters: additionalParameters,
+          contentType: contentType,
+          critical: critical,
+          jsonWebKey: jsonWebKey,
+          jwkSetUri: jwkSetUri,
+          x509certificateChain: x509certificateChain,
+          x509certificateSha1: x509certificateSha1,
+          x509certificateSha256: x509certificateSha256,
+          x509certificateUri: x509certificateUri);
+    } else {
+      return JwsJoseHeader(
+          algorithm: alg,
+          type: type,
+          keyId: keyId,
+          additionalParameters: additionalParameters,
+          contentType: contentType,
+          critical: critical,
+          jsonWebKey: jsonWebKey,
+          jwkSetUri: jwkSetUri,
+          x509certificateChain: x509certificateChain,
+          x509certificateSha1: x509certificateSha1,
+          x509certificateSha256: x509certificateSha256,
+          x509certificateUri: x509certificateUri);
     }
   }
 
-  @override
-  Map<String, dynamic> toJson() => {
-        'protected': protected,
-        'unprotected': unprotected,
-      };
-
-  Map<String, dynamic> get protected {
-    Map<String, dynamic> map = {...additionalProtected, 'alg': algorithm.name};
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> map = {};
+    type != null ? map['typ'] = type : null;
+    contentType != null ? map['cty'] = contentType : null;
     jwkSetUri != null ? map['jku'] = jwkSetUri!.toString() : null;
     jsonWebKey != null ? map['jwk'] = jsonWebKey!.toJson() : null;
     keyId != null ? map['kid'] = keyId! : null;
@@ -148,10 +127,37 @@ class JwsJoseHeader extends JoseHeader {
         ? map['jku'] = base64Url.encode(x509certificateSha256!.toList())
         : null;
     critical != null ? map['crit'] = critical : null;
+    if (additionalParameters != null) map.addAll(additionalParameters!);
     return map;
   }
 
-  Map<String, dynamic> get unprotected => super.toJson();
+  @override
+  String toString() => toJson().toString();
+}
+
+class JwsJoseHeader extends JoseHeader {
+  SigningAlgorithm algorithm;
+
+  JwsJoseHeader(
+      {required this.algorithm,
+      super.type,
+      super.contentType,
+      super.jwkSetUri,
+      super.jsonWebKey,
+      super.keyId,
+      super.x509certificateUri,
+      super.x509certificateChain,
+      super.x509certificateSha1,
+      super.x509certificateSha256,
+      super.critical,
+      super.additionalParameters});
+
+  @override
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> map = {'alg': algorithm.name};
+    map.addAll(super.toJson());
+    return map;
+  }
 }
 
 class JweJoseHeader extends JoseHeader {}
