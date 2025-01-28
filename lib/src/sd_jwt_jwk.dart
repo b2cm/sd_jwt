@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:pointycastle/asn1.dart' as asn1;
 import 'package:sd_jwt/src/crypto_provider/ed25519_edwards_crypto_provider.dart';
 import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
@@ -88,8 +89,7 @@ class Jwk {
         }
         if (map['d'] == null) {
           key = EdPublicKey(
-              pubA: base64.decode(addPaddingToBase64(map['x'])),
-              curve: curve);
+              pubA: base64.decode(addPaddingToBase64(map['x'])), curve: curve);
         } else {
           key = EdPrivateKey(
               pubA: base64.decode(addPaddingToBase64(map['x'])),
@@ -236,6 +236,63 @@ class Jwk {
         : null;
   }
 
+  /// Parse a public key from a X509 certificate
+  ///
+  /// [x509Certificate] is the base64 encoded certificate WITHOUT the
+  /// ----- BEGIN Certificate ----- and ----- END CERTIFICATE ------ marker.
+  factory Jwk.fromCertificate(String x509Certificate) {
+    var p = asn1.ASN1Parser(base64Decode(x509Certificate));
+    var certSequence = p.nextObject() as asn1.ASN1Sequence;
+    var tbsCert = certSequence.elements!.first as asn1.ASN1Sequence;
+    var pubKeyIndex = 5;
+    // check if there is explicit version
+    if (tbsCert.elements!.first.tag == 160) {
+      pubKeyIndex = 6;
+    }
+    var pubKeyFromCert = asn1.ASN1SubjectPublicKeyInfo.fromSequence(
+        tbsCert.elements![pubKeyIndex] as asn1.ASN1Sequence);
+    var pubKeyBytes = pubKeyFromCert.subjectPublicKey.valueBytes!;
+    var pubKeyAlgorithm = pubKeyFromCert.algorithm.algorithm;
+
+    Jwk tmp;
+    if (pubKeyAlgorithm.readableName == 'ecPublicKey') {
+      var pubKeyParameter =
+          pubKeyFromCert.algorithm.parameters as asn1.ASN1ObjectIdentifier;
+      var compression = pubKeyBytes[1];
+      if (compression != 4) {
+        throw UnsupportedError(
+            'only uncompressed keys are supported: current compression: $compression');
+      }
+      if (pubKeyParameter.readableName == 'prime256v1') {
+        var x = pubKeyBytes.sublist(2, 34);
+        var y = pubKeyBytes.sublist(34);
+        var k = EcPublicKey(x: x, y: y, curve: Curve.p256);
+        tmp = Jwk(keyType: KeyType.ec, key: k);
+      } else if (pubKeyParameter.readableName == 'secp384r1') {
+        var x = pubKeyBytes.sublist(2, 50);
+        var y = pubKeyBytes.sublist(50);
+        var k = EcPublicKey(x: x, y: y, curve: Curve.p384);
+        tmp = Jwk(keyType: KeyType.ec, key: k);
+      } else if (pubKeyParameter.readableName == 'secp521r1') {
+        var x = pubKeyBytes.sublist(2, 68);
+        var y = pubKeyBytes.sublist(68);
+        var k = EcPublicKey(x: x, y: y, curve: Curve.p521);
+        tmp = Jwk(keyType: KeyType.ec, key: k);
+      } else {
+        throw Exception('Unknown or unsupported curve');
+      }
+    } else if (pubKeyAlgorithm.objectIdentifierAsString == '1.3.101.112') {
+      var k =
+          EdPublicKey(curve: Curve.curve25519, pubA: pubKeyBytes.sublist(1));
+      tmp = Jwk(keyType: KeyType.ec, key: k);
+    } else {
+      throw Exception(
+          'Unsupported Algorithm: ${pubKeyAlgorithm.readableName}/${pubKeyAlgorithm.objectIdentifierAsString}');
+    }
+
+    return tmp;
+  }
+
   Map<String, dynamic> toJson() {
     Map<String, dynamic> map = {
       'kty': keyType.name,
@@ -279,21 +336,21 @@ class Jwk {
       map['d'] =
           removePaddingFromBase64(base64Url.encode((key as EcPrivateKey).d));
       map['crv'] = (key as EcPrivateKey).curve.name;
-
     } else if (key is EcPublicKey) {
       map['x'] =
           removePaddingFromBase64(base64Url.encode((key as EcPublicKey).x));
       map['y'] =
           removePaddingFromBase64(base64Url.encode((key as EcPublicKey).y));
       map['crv'] = (key as EcPublicKey).curve.name;
-
     } else if (key is EdPrivateKey) {
-      map['d'] = removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).a));
-      map['x'] = removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).pubA));
+      map['d'] =
+          removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).a));
+      map['x'] =
+          removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).pubA));
       map['crv'] = (key as EdPublicKey).curve.name;
-
     } else if (key is EdPublicKey) {
-      map['x'] = removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).pubA));
+      map['x'] =
+          removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).pubA));
       map['crv'] = (key as EdPublicKey).curve.name;
     }
 
@@ -371,8 +428,8 @@ class EcPrivateKey extends EcPublicKey implements PrivateKey {
   factory EcPrivateKey.generate(Curve curve) {
     PointyCastleCryptoProvider pointyCastleCryptoProvider =
         PointyCastleCryptoProvider();
-    return pointyCastleCryptoProvider.generateKeyPair(keyParameters: EcKeyParameters(curve))
-        as EcPrivateKey;
+    return pointyCastleCryptoProvider.generateKeyPair(
+        keyParameters: EcKeyParameters(curve)) as EcPrivateKey;
   }
 
   @override
@@ -388,8 +445,10 @@ class EdPrivateKey extends EdPublicKey implements PrivateKey {
   EdPrivateKey({required super.curve, required this.a, required super.pubA});
 
   factory EdPrivateKey.generate({required Curve curve, Uint8List? seed}) {
-    Ed25519EdwardsCryptoProvider ed25519EdwardsCryptoProvider = Ed25519EdwardsCryptoProvider();
-    return ed25519EdwardsCryptoProvider.generateKeyPair(keyParameters: EcKeyParameters(curve), seed: seed) as EdPrivateKey;
+    Ed25519EdwardsCryptoProvider ed25519EdwardsCryptoProvider =
+        Ed25519EdwardsCryptoProvider();
+    return ed25519EdwardsCryptoProvider.generateKeyPair(
+        keyParameters: EcKeyParameters(curve), seed: seed) as EdPrivateKey;
   }
 
   @override

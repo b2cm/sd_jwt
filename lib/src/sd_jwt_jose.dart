@@ -52,7 +52,7 @@ class JoseHeader {
         x509certificateUri = Uri.tryParse(entry.value);
       } else if (entry.key == 'x5c') {
         x509certificateChain =
-            (entry.value as List<String>).map((e) => base64.decode(e)).toList();
+            (entry.value as List).map((e) => base64.decode(e)).toList();
       } else if (entry.key == 'x5t') {
         x509certificateSha1 = base64Url.decode(entry.value);
       } else if (entry.key == 'x5t#256') {
@@ -118,7 +118,8 @@ class JoseHeader {
         ? map['x5u'] = x509certificateUri!.toString()
         : null;
     x509certificateChain != null
-        ? map['x5c'] = x509certificateChain!.map((e) => base64.encode(e))
+        ? map['x5c'] =
+            x509certificateChain!.map((e) => base64.encode(e)).toList()
         : null;
     x509certificateSha1 != null
         ? map['x5t'] = base64Url.encode(x509certificateSha1!.toList())
