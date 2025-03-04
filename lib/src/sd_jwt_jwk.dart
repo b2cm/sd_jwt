@@ -108,7 +108,8 @@ class Jwk {
         Curve curve;
         if (map['crv'] == Curve.p256.name) {
           curve = Curve.p256;
-        } else if (map['crv'] == Curve.p256k.name) {
+        } else if (map['crv'] == Curve.p256k.name ||
+            map['crv'] == 'secp256k1') {
           curve = Curve.p256k;
         } else if (map['crv'] == Curve.p384.name) {
           curve = Curve.p384;

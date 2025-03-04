@@ -195,7 +195,7 @@ class SdJws extends Jws {
     String compactSerialization = super.toCompactSerialization();
     _disclosures != null
         ? compactSerialization +=
-            '~${_disclosures!.origin.map((e) => removePaddingFromBase64(base64Url.encode(e))).join('~')}'
+            '~${_disclosures!.origin.map((e) => removePaddingFromBase64(base64Url.encode(e))).join('~')}~'
         : null;
     PointyCastleCryptoProvider pointyCastleCryptoProvider =
         PointyCastleCryptoProvider();
@@ -209,7 +209,7 @@ class SdJws extends Jws {
       required String audience,
       required DateTime issuedAt,
       required String nonce,
-      SigningAlgorithm? signingAlgorithm,
+      required SigningAlgorithm signingAlgorithm,
       DigestAlgorithm? digestAlgorithm}) async {
     Uint8List sdHash = digest;
 

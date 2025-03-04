@@ -1386,7 +1386,7 @@ class KbJwt extends Jwt {
     return super.payload
       ..addAll({
         'nonce': nonce,
-        'sd_hash': base64Url.encode(sdHash),
+        'sd_hash': removePaddingFromBase64(base64Url.encode(sdHash)),
       });
   }
 
@@ -1400,8 +1400,8 @@ class KbJwt extends Jwt {
   }
 
   KbJwt.fromJws(super.jsonWebSignature)
-      : sdHash = base64Url.decode(
-            json.decode(utf8.decode(jsonWebSignature.payload))['sd_hash']),
+      : sdHash = base64Url.decode(addPaddingToBase64(
+            json.decode(utf8.decode(jsonWebSignature.payload))['sd_hash'])),
         nonce = json.decode(utf8.decode(jsonWebSignature.payload))['nonce'],
         super.fromJws();
 
@@ -1410,8 +1410,12 @@ class KbJwt extends Jwt {
       {required CryptoProvider signer,
       JwsJoseHeader? header,
       SigningAlgorithm? signingAlgorithm}) async {
-    Jws jws =
-        await super.sign(signer: signer, signingAlgorithm: signingAlgorithm);
+    Jws jws = await super.sign(
+        signer: signer,
+        signingAlgorithm: signingAlgorithm,
+        header: JwsJoseHeader(
+            type: 'kb+jwt',
+            algorithm: signingAlgorithm ?? SigningAlgorithm.eddsa25519Sha512));
     return KbJws(
         payload: jws.payload,
         signature: jws.signature,
