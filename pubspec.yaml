@@ -1,5 +1,5 @@
 name: sd_jwt
-description: Dart implementation of credential format SD-JWT.
+description: Dart implementation of credential format SD-JWT and JWT/JWS in general.
 version: 1.0.0
 repository: https://github.com/b2cm/sd_jwt
 

@@ -12,12 +12,6 @@ class Ed25519EdwardsCryptoProvider implements CryptoProvider {
   Ed25519EdwardsCryptoProvider([this.key]);
 
   @override
-  Uint8List digest(
-      {required Uint8List data, required DigestAlgorithm algorithm}) {
-    throw UnimplementedError();
-  }
-
-  @override
   Key generateKeyPair({required KeyParameters keyParameters, Uint8List? seed}) {
     if (keyParameters is EcKeyParameters &&
         keyParameters.curve == Curve.curve25519) {

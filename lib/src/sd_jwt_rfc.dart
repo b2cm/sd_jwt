@@ -17,5 +17,4 @@ class RFC7515 {
 
   static Uint8List bytes(Map<String, dynamic> map) =>
       utf8.encode(json.encode(map));
-
 }
