@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_jose.dart';
 import 'package:sd_jwt/src/sd_jwt_jwk.dart';
@@ -75,6 +74,7 @@ class SdJwt extends Jwt {
     alwaysDisclosed != null ? _alwaysDisclosed = alwaysDisclosed : null;
   }
 
+  /// Parse SDJws to SDJwt
   SdJwt.fromSdJws(SdJws sdJws)
       : _digestAlgorithm = DigestAlgorithm.values.singleWhere((e) =>
             e.name == json.decode(utf8.decode(sdJws.payload))['_sd_alg']),
@@ -90,6 +90,7 @@ class SdJwt extends Jwt {
     }
   }
 
+  /// Parse Json Representation of SDJwt
   SdJwt.fromJson(Map<String, dynamic> map)
       : _digestAlgorithm = DigestAlgorithm.values
             .singleWhere((e) => e.name == map['payload']['_sd_alg']),
@@ -109,10 +110,10 @@ class SdJwt extends Jwt {
     }
   }
 
-  // Builds disclosures from payload, except registered claims.
-  //
-  // Salt algorithm can be set by SaltAlgorithm object. Defaults to Base64Url
-  // encoded random data with length of 256 bits. Padding will be removed.
+  /// Builds disclosures from payload, except registered claims.
+  ///
+  /// Salt algorithm can be set by SaltAlgorithm object. Defaults to Base64Url
+  /// encoded random data with length of 256 bits. Padding will be removed.
   void build({SaltAlgorithm? saltAlgorithm}) {
     _disclosures = _createDisclosuresMap(
         super.payload,
@@ -123,6 +124,11 @@ class SdJwt extends Jwt {
   }
 
   @override
+
+  /// Signs this SD-JWT and returns a SD-JWS
+  ///
+  /// Either a JWS-Header must be set (during generation of this sd-jwt or
+  /// with [header] parameter) or [signingAlgorithm] must be given.
   FutureOr<SdJws> sign(
       {required CryptoProvider signer,
       JwsJoseHeader? header,
@@ -255,9 +261,7 @@ class SdJwt extends Jwt {
   }
 
   Uint8List _digest(Uint8List digestInput) {
-    PointyCastleCryptoProvider pointyCastleCryptoProvider =
-        PointyCastleCryptoProvider();
-    return pointyCastleCryptoProvider.digest(
+    return generateDigest(
         data: ascii
             .encode(removePaddingFromBase64(base64Url.encode(digestInput))),
         algorithm: _digestAlgorithm);
@@ -664,28 +668,30 @@ class Jwt {
         signature: sig);
   }
 
+  /// Signs this JWT and returns a JWS
+  ///
+  /// Either a JWS-Header must be set (during generation of this jwt or
+  /// with [header] parameter) or [signingAlgorithm] must be given.
   FutureOr<Jws> sign(
       {required CryptoProvider signer,
       JwsJoseHeader? header,
       SigningAlgorithm? signingAlgorithm}) async {
-    if (header?.algorithm == null && signingAlgorithm == null) {
-      throw Exception('Signing algorithm not set!');
-    }
-
-    signingAlgorithm ??= header!.algorithm;
-
     JwsJoseHeader jwsHeader;
-    if (header != null) {
-      jwsHeader = header;
-    } else if (_header is JwsJoseHeader) {
+    if (_header is JwsJoseHeader) {
       jwsHeader = _header;
-    } else {
+    } else if (header != null) {
+      jwsHeader = header;
+    } else if (signingAlgorithm != null) {
       jwsHeader = JwsJoseHeader(
         algorithm: signingAlgorithm,
         type: _header.type,
         contentType: _header.contentType,
       );
+    } else {
+      throw Exception('Neither singing algorithm nor header parameters set');
     }
+
+    signingAlgorithm = jwsHeader.algorithm;
 
     Map<String, dynamic> payload = Map.of(this.payload);
 
@@ -706,6 +712,7 @@ class Jwt {
   Map<String, dynamic> toJson() =>
       {'header': _header.toJson(), 'payload': payload};
 
+  /// Returns the json encoded representation
   String toJsonString() => json.encode(toJson());
 
   @override
@@ -1168,9 +1175,7 @@ class Disclosure {
   }
 
   Uint8List digest(DigestAlgorithm digestAlgorithm) {
-    PointyCastleCryptoProvider pointyCastleCryptoProvider =
-        PointyCastleCryptoProvider();
-    return pointyCastleCryptoProvider.digest(
+    return generateDigest(
         data: ascii.encode(removePaddingFromBase64(base64Url.encode(bytes))),
         algorithm: digestAlgorithm);
   }
@@ -1353,6 +1358,7 @@ class RandomBase64SaltValue implements SaltValue {
       {bool padding = false, bool urlSafe = true, this.length = 256})
       : _value = generate(length: length);
 
+  /// generate a random salt with [length] and encode it base64(url)
   static String generate(
       {bool padding = false, bool urlSafe = true, required int length}) {
     if (length % 8 != 0) {

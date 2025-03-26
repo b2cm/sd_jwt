@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:pointycastle/export.dart' as pointy_castle;
@@ -7,6 +6,7 @@ import 'package:sd_jwt/src/sd_jwt_jwk.dart';
 
 import '../sd_jwt_utils.dart';
 
+/// Software Crypto Provider for ES256, ES256k, ES384 and ES512
 class PointyCastleCryptoProvider implements CryptoProvider {
   @override
   String get name => 'pointy_castle';
@@ -29,7 +29,7 @@ class PointyCastleCryptoProvider implements CryptoProvider {
       }
       pointy_castle.ECDomainParameters ecDomainParameters =
           _getECDomainParameters(privateKey.curve);
-      pointy_castle.Digest digest = _getDigest(algorithm);
+      pointy_castle.Digest digest = getDigest(algorithm);
 
       int length = {
         Curve.p256: 32,
@@ -50,14 +50,6 @@ class PointyCastleCryptoProvider implements CryptoProvider {
 
       pointy_castle.ECSignature signature =
           ecdsaSigner.generateSignature(data) as pointy_castle.ECSignature;
-
-      // Uint8List bytes = Uint8List(length * 2);
-      // bytes.setRange(
-      //     0, length, bigIntToBytes(signature.r, length).toList().reversed);
-      // bytes.setRange(length, length * 2,
-      //     bigIntToBytes(signature.s, length).toList().reversed);
-      //
-      // return bytes;
 
       return EcSignature(
           Uint8List.fromList(
@@ -94,7 +86,7 @@ class PointyCastleCryptoProvider implements CryptoProvider {
       pointy_castle.ECPublicKey key =
           pointy_castle.ECPublicKey(point, ecDomainParameters);
 
-      pointy_castle.Digest digest = _getDigest(algorithm);
+      pointy_castle.Digest digest = getDigest(algorithm);
 
       pointy_castle.ECDSASigner ecdsaSigner =
           pointy_castle.ECDSASigner(digest, null);
@@ -113,7 +105,6 @@ class PointyCastleCryptoProvider implements CryptoProvider {
   @override
   Key generateKeyPair({required KeyParameters keyParameters}) {
     if (keyParameters is EcKeyParameters) {
-      keyParameters as EcKeyParameters;
       pointy_castle.ECDomainParameters ecDomainParameters =
           _getECDomainParameters(keyParameters.curve);
 
@@ -153,73 +144,5 @@ class PointyCastleCryptoProvider implements CryptoProvider {
       case Curve.curve25519:
         throw Exception('Curve not supported by this implementation.');
     }
-  }
-
-  pointy_castle.Digest _getDigest(SigningAlgorithm algorithm) {
-    switch (algorithm) {
-      case SigningAlgorithm.ecdsaSha256Prime:
-        return pointy_castle.SHA256Digest();
-      case SigningAlgorithm.ecdsaSha256Koblitz:
-        return pointy_castle.SHA256Digest();
-      case SigningAlgorithm.ecdsaSha384Prime:
-        return pointy_castle.SHA384Digest();
-      case SigningAlgorithm.ecdsaSha512Prime:
-        return pointy_castle.SHA512Digest();
-      case SigningAlgorithm.ecdsaSha256KoblitzRecovery:
-        return pointy_castle.SHA256Digest();
-      default:
-        throw Exception(
-            'Signing algorithm not supported by this implementation.');
-    }
-  }
-
-  @override
-  Uint8List digest(
-      {required Uint8List data, required DigestAlgorithm algorithm}) {
-    pointy_castle.Digest digest;
-    switch (algorithm) {
-      case DigestAlgorithm.sha2_256:
-        digest = pointy_castle.SHA256Digest();
-      case DigestAlgorithm.sha2_384:
-        digest = pointy_castle.SHA384Digest();
-      case DigestAlgorithm.sha2_512:
-        digest = pointy_castle.SHA512Digest();
-      case DigestAlgorithm.sha3_256:
-        digest = pointy_castle.SHA3Digest(256);
-    }
-    return digest.process(data);
-  }
-}
-
-class DefaultSecureRandom implements pointy_castle.SecureRandom {
-  final Random random = Random.secure();
-
-  @override
-  String get algorithmName => 'dart.math.Random.secure()';
-
-  @override
-  BigInt nextBigInteger(int bitLength) {
-    return BigInt.parse(
-        Iterable.generate(bitLength, (_) => random.nextBool() ? '1' : '0')
-            .join(''),
-        radix: 2);
-  }
-
-  @override
-  Uint8List nextBytes(int count) =>
-      Uint8List.fromList(List.generate(count, (_) => nextUint8()));
-
-  @override
-  int nextUint16() => random.nextInt(256 * 256);
-
-  @override
-  int nextUint32() => random.nextInt(256 * 256 * 256 * 256);
-
-  @override
-  int nextUint8() => random.nextInt(256);
-
-  @override
-  void seed(pointy_castle.CipherParameters params) {
-    throw UnsupportedError('Seed not supported for this SecureRandom');
   }
 }

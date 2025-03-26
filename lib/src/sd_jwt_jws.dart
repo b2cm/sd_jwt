@@ -197,13 +197,11 @@ class SdJws extends Jws {
         ? compactSerialization +=
             '~${_disclosures!.origin.map((e) => removePaddingFromBase64(base64Url.encode(e))).join('~')}~'
         : null;
-    PointyCastleCryptoProvider pointyCastleCryptoProvider =
-        PointyCastleCryptoProvider();
     Uint8List digestInput = ascii.encode(compactSerialization);
-    return pointyCastleCryptoProvider.digest(
-        data: digestInput, algorithm: _digestAlgorithm);
+    return generateDigest(data: digestInput, algorithm: _digestAlgorithm);
   }
 
+  /// Bind a KeBinding JWT (KB-JWT) to this SD-JWS
   FutureOr<SdJws> bind(
       {required CryptoProvider signer,
       required String audience,
@@ -360,6 +358,7 @@ class Jws {
   Jwt toJwt() => Jwt.fromJws(this);
 }
 
+/// KeyBinding JWS
 class KbJws extends Jws {
   KbJws({
     required super.payload,

@@ -5,6 +5,7 @@ import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_jwk.dart';
 
+/// Software Crypto Provider for EdDSA Signatures with Curve ed25519
 class Ed25519EdwardsCryptoProvider implements CryptoProvider {
   final AsymmetricKey? key;
 

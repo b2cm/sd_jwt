@@ -136,6 +136,7 @@ class JoseHeader {
   String toString() => toJson().toString();
 }
 
+/// Jose Header for JsonWebSignatures
 class JwsJoseHeader extends JoseHeader {
   SigningAlgorithm algorithm;
 

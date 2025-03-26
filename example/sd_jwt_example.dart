@@ -5,20 +5,10 @@ import 'package:sd_jwt/sd_jwt.dart';
 
 Future<void> main() async {
   // At first, you need some key material for signing and verification tasks.
-  // If you want to use an external key management system, simply
-  // export and import a JSON Web Key from yours to this:
+  // You can use internal data structures to handle keys:
 
-  Map<String, dynamic> extJwk = {'kty': 'dummy'};
-  Jwk issuerJwk;
-  try {
-    issuerJwk = Jwk.fromJson(extJwk);
-  } on Exception catch (e) {
-    print(e); // Exception: Key type `dummy` not supported.
-  }
-
-  // Otherwise, you can use internal data structures to handle keys:
-
-  issuerJwk = Jwk(keyType: KeyType.ec, key: EcPrivateKey.generate(Curve.p521));
+  var issuerJwk =
+      Jwk(keyType: KeyType.ec, key: EcPrivateKey.generate(Curve.p521));
   var issuerCryptoProvider =
       PointyCastleCryptoProvider(issuerJwk.key as EcPrivateKey);
 
@@ -80,16 +70,11 @@ Future<void> main() async {
 
   String awesomeSignedCompact = awesomeSigned.toCompactSerialization();
 
-  // A HOLDER now can disclose som attributes and then bind his key material to
+  // A HOLDER now can disclose some attributes and then bind his key material to
   // the SD-JWS by adding a Key Binding JWS (KB-JWS):
 
   awesomeSigned = SdJws.fromCompactSerialization(awesomeSignedCompact);
   print(json.encode(awesomeSigned.jsonContent()));
-
-  // Disclosure toRemove =
-  //     awesomeSigned.disclosures!.singleWhere((e) => e.key == 'street_address');
-  // awesomeSigned.disclosures!.remove(toRemove);
-  // awesomeSigned.disclosures!.clear();
 
   var toPresent = awesomeSigned.disclose(
       [JsonPath(r'$.address.street_address'), JsonPath(r'$.given_name')]);

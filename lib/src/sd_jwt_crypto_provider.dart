@@ -3,13 +3,14 @@ import 'dart:typed_data';
 
 import 'package:sd_jwt/src/sd_jwt_jwk.dart';
 
+/// Base class for Crypto Operations.
+///
+/// Implement it to use other crypto operations with this library, e.g.
+/// if you need hardware based crypto
 abstract class CryptoProvider {
   final String name = '';
 
   Key generateKeyPair({required KeyParameters keyParameters});
-
-  Uint8List digest(
-      {required Uint8List data, required DigestAlgorithm algorithm});
 
   FutureOr<Signature> sign(
       {required Uint8List data, required SigningAlgorithm algorithm});
