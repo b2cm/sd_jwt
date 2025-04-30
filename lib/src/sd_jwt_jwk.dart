@@ -351,7 +351,7 @@ class Jwk {
       map['crv'] = (key as EdPublicKey).curve.name;
     } else if (key is EdPublicKey) {
       map['x'] =
-          removePaddingFromBase64(base64Url.encode((key as EdPrivateKey).pubA));
+          removePaddingFromBase64(base64Url.encode((key as EdPublicKey).pubA));
       map['crv'] = (key as EdPublicKey).curve.name;
     }
 
