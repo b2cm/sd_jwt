@@ -37,6 +37,7 @@ enum SigningAlgorithm {
   ecdsaSha384Prime,
   ecdsaSha512Prime,
   eddsa25519Sha512,
+  rsaSha256
 }
 
 enum DigestAlgorithm { sha2_256, sha2_384, sha2_512, sha3_256 }
@@ -71,6 +72,8 @@ extension DigestAlgorithmName on SigningAlgorithm {
         return 'SHA-512';
       case SigningAlgorithm.eddsa25519Sha512:
         return 'SHA-512';
+      case SigningAlgorithm.rsaSha256:
+        return 'SHA-256';
     }
   }
 }
@@ -90,6 +93,8 @@ extension DigestAlgorithmLength on SigningAlgorithm {
         return 512;
       case SigningAlgorithm.eddsa25519Sha512:
         return 512;
+      case SigningAlgorithm.rsaSha256:
+        return 256;
     }
   }
 }
@@ -109,6 +114,8 @@ extension JWA on SigningAlgorithm {
         return 'ES512';
       case SigningAlgorithm.eddsa25519Sha512:
         return 'EdDSA';
+      case SigningAlgorithm.rsaSha256:
+        return 'RS256';
     }
   }
 
@@ -126,6 +133,8 @@ extension JWA on SigningAlgorithm {
         return 'ECDSA using P-521 and SHA-512';
       case SigningAlgorithm.eddsa25519Sha512:
         return 'EDDSA using Curve25519 and SHA-512';
+      case SigningAlgorithm.rsaSha256:
+        return 'RSA using SHA-256';
     }
   }
 }

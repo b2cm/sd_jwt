@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:pointycastle/asn1.dart' as asn1;
+import 'package:pointycastle/export.dart';
 import 'package:sd_jwt/src/crypto_provider/ed25519_edwards_crypto_provider.dart';
 import 'package:sd_jwt/src/crypto_provider/pointycastle_crypto_provider.dart';
 import 'package:sd_jwt/src/sd_jwt_crypto_provider.dart';
@@ -132,22 +133,28 @@ class Jwk {
         }
       } else if ((map['kty'] as String) == KeyType.rsa.name) {
         keyType = KeyType.rsa;
-        List<String> properties = ['n', 'e', 'd', 'p', 'q', 'dp', 'dq', 'qi'];
-        for (String property in properties) {
-          if (!map.containsKey(property) || map[property] is! String) {
-            throw Exception(
-                'Key could not be loaded. Property $property not found.');
+        if (map.containsKey('d')) {
+          List<String> properties = ['n', 'e', 'd', 'p', 'q', 'dp', 'dq', 'qi'];
+          for (String property in properties) {
+            if (!map.containsKey(property) || map[property] is! String) {
+              throw Exception(
+                  'Key could not be loaded. Property $property not found.');
+            }
           }
+          key = RsaPrivateKey(
+              n: base64.decode(addPaddingToBase64(map['n'])),
+              e: base64.decode(addPaddingToBase64(map['e'])),
+              d: base64.decode(addPaddingToBase64(map['d'])),
+              p: base64.decode(addPaddingToBase64(map['p'])),
+              q: base64.decode(addPaddingToBase64(map['q'])),
+              dp: base64.decode(addPaddingToBase64(map['dp'])),
+              dq: base64.decode(addPaddingToBase64(map['dq'])),
+              qi: base64.decode(addPaddingToBase64(map['qi'])));
+        } else {
+          key = RsaPublicKey(
+              n: base64.decode(addPaddingToBase64(map['n'])),
+              e: base64.decode(addPaddingToBase64(map['e'])));
         }
-        key = RsaPrivateKey(
-            n: base64.decode(addPaddingToBase64(map['n'])),
-            e: base64.decode(addPaddingToBase64(map['e'])),
-            d: base64.decode(addPaddingToBase64(map['d'])),
-            p: base64.decode(addPaddingToBase64(map['p'])),
-            q: base64.decode(addPaddingToBase64(map['q'])),
-            dp: base64.decode(addPaddingToBase64(map['dp'])),
-            dq: base64.decode(addPaddingToBase64(map['dq'])),
-            qi: base64.decode(addPaddingToBase64(map['qi'])));
       } else {
         throw Exception('Key type `${map['kty']}` not supported.');
       }
@@ -198,6 +205,8 @@ class Jwk {
           algorithm = SigningAlgorithm.ecdsaSha512Prime;
         } else if (map['alg'] == SigningAlgorithm.eddsa25519Sha512.name) {
           algorithm = SigningAlgorithm.eddsa25519Sha512;
+        } else if (map['alg'] == SigningAlgorithm.rsaSha256.name) {
+          algorithm = SigningAlgorithm.rsaSha256;
         } else {
           throw Exception('Algorithm `${map['alg']}` not supported');
         }
@@ -285,7 +294,7 @@ class Jwk {
     } else if (pubKeyAlgorithm.objectIdentifierAsString == '1.3.101.112') {
       var k =
           EdPublicKey(curve: Curve.curve25519, pubA: pubKeyBytes.sublist(1));
-      tmp = Jwk(keyType: KeyType.ec, key: k);
+      tmp = Jwk(keyType: KeyType.okp, key: k);
     } else {
       throw Exception(
           'Unsupported Algorithm: ${pubKeyAlgorithm.readableName}/${pubKeyAlgorithm.objectIdentifierAsString}');
@@ -358,6 +367,33 @@ class Jwk {
     return map;
   }
 
+  List<int> getThumbprint() {
+    Map<String, dynamic> dataToHash = {};
+    if (key is RsaPrivateKey || key is RsaPublicKey) {
+      dataToHash = {
+        'e': removePaddingFromBase64(base64Url.encode((key as RsaPublicKey).e)),
+        'kty': keyType.name,
+        'n': removePaddingFromBase64(base64Url.encode((key as RsaPublicKey).n))
+      };
+    } else if (key is EcPrivateKey || key is EcPublicKey) {
+      dataToHash = {
+        'crv': (key as EcPublicKey).curve.name,
+        'kty': keyType.name,
+        'x': removePaddingFromBase64(base64Url.encode((key as EcPublicKey).x)),
+        'y': removePaddingFromBase64(base64Url.encode((key as EcPublicKey).y))
+      };
+    } else if (key is EdPrivateKey || key is EdPublicKey) {
+      dataToHash = {
+        'crv': (key as EcPublicKey).curve.name,
+        'kty': keyType.name,
+        'x': removePaddingFromBase64(base64Url.encode((key as EcPublicKey).x)),
+      };
+    } else {
+      throw Exception('Unsupported keytype');
+    }
+    return SHA256Digest().process(utf8.encode(jsonEncode(dataToHash)));
+  }
+
   @override
   String toString() => toJson().toString();
 }
@@ -376,9 +412,16 @@ abstract class PrivateKey implements AsymmetricKey {
 
 abstract class PublicKey implements AsymmetricKey {}
 
-class RsaPrivateKey implements AsymmetricKey {
-  Uint8List n;
-  Uint8List e;
+class RsaPublicKey extends PublicKey {
+  Uint8List n, e;
+
+  RsaPublicKey({required this.n, required this.e});
+
+  @override
+  PublicKey get public => this;
+}
+
+class RsaPrivateKey extends RsaPublicKey implements PrivateKey {
   Uint8List d;
   Uint8List p;
   Uint8List q;
@@ -387,8 +430,8 @@ class RsaPrivateKey implements AsymmetricKey {
   Uint8List qi;
 
   RsaPrivateKey(
-      {required this.n,
-      required this.e,
+      {required super.n,
+      required super.e,
       required this.d,
       required this.p,
       required this.q,
@@ -397,8 +440,11 @@ class RsaPrivateKey implements AsymmetricKey {
       required this.qi});
 
   @override
-  // TODO: implement public
-  PublicKey get public => throw UnimplementedError();
+  PublicKey get public => RsaPublicKey(n: n, e: e);
+
+  @override
+  // TODO: implement private
+  Uint8List get private => throw UnimplementedError();
 }
 
 abstract class EcKey implements AsymmetricKey {
