@@ -10,8 +10,8 @@ dependencies:
   pointycastle: ^4.0.0
   ed25519_edwards: ^0.3.1
   uuid: ^4.5.0
-  json_path: ^0.7.4
+  json_path: ^0.8.0
 
 dev_dependencies:
-  lints: ^5.0.0
+  lints: ^6.0.0
   test: ^1.24.0
