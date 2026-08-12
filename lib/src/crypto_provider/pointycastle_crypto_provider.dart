@@ -143,6 +143,8 @@ class PointyCastleCryptoProvider implements CryptoProvider {
         return pointy_castle.ECCurve_secp521r1();
       case Curve.curve25519:
         throw Exception('Curve not supported by this implementation.');
+      case Curve.x25519:
+        throw Exception('Curve not supported by this implementation.');
     }
   }
 }

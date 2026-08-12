@@ -85,6 +85,8 @@ class Jwk {
         Curve curve;
         if (map['crv'] == Curve.curve25519.name) {
           curve = Curve.curve25519;
+        } else if (map['crv'] == Curve.x25519.name) {
+          curve = Curve.x25519;
         } else {
           throw Exception('Curve `${map['crv']} not supported.');
         }
@@ -207,6 +209,8 @@ class Jwk {
           algorithm = SigningAlgorithm.eddsa25519Sha512;
         } else if (map['alg'] == SigningAlgorithm.rsaSha256.name) {
           algorithm = SigningAlgorithm.rsaSha256;
+        } else if (map['alg'] == SigningAlgorithm.ecdhEs.name) {
+          algorithm = SigningAlgorithm.ecdhEs;
         } else {
           throw Exception('Algorithm `${map['alg']}` not supported');
         }
@@ -384,9 +388,10 @@ class Jwk {
       };
     } else if (key is EdPrivateKey || key is EdPublicKey) {
       dataToHash = {
-        'crv': (key as EcPublicKey).curve.name,
+        'crv': (key as EdPublicKey).curve.name,
         'kty': keyType.name,
-        'x': removePaddingFromBase64(base64Url.encode((key as EcPublicKey).x)),
+        'x': removePaddingFromBase64(
+            base64Url.encode((key as EdPublicKey).pubA)),
       };
     } else {
       throw Exception('Unsupported keytype');

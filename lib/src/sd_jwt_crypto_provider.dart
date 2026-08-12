@@ -37,7 +37,8 @@ enum SigningAlgorithm {
   ecdsaSha384Prime,
   ecdsaSha512Prime,
   eddsa25519Sha512,
-  rsaSha256
+  rsaSha256,
+  ecdhEs
 }
 
 enum DigestAlgorithm { sha2_256, sha2_384, sha2_512, sha3_256 }
@@ -74,6 +75,8 @@ extension DigestAlgorithmName on SigningAlgorithm {
         return 'SHA-512';
       case SigningAlgorithm.rsaSha256:
         return 'SHA-256';
+      case SigningAlgorithm.ecdhEs:
+        return 'ECDH-ES';
     }
   }
 }
@@ -94,6 +97,8 @@ extension DigestAlgorithmLength on SigningAlgorithm {
       case SigningAlgorithm.eddsa25519Sha512:
         return 512;
       case SigningAlgorithm.rsaSha256:
+        return 256;
+      case SigningAlgorithm.ecdhEs:
         return 256;
     }
   }
@@ -116,6 +121,8 @@ extension JWA on SigningAlgorithm {
         return 'EdDSA';
       case SigningAlgorithm.rsaSha256:
         return 'RS256';
+      case SigningAlgorithm.ecdhEs:
+        return 'ECDH-ES';
     }
   }
 
@@ -135,17 +142,13 @@ extension JWA on SigningAlgorithm {
         return 'EDDSA using Curve25519 and SHA-512';
       case SigningAlgorithm.rsaSha256:
         return 'RSA using SHA-256';
+      case SigningAlgorithm.ecdhEs:
+        return 'ECDH-ES';
     }
   }
 }
 
-enum Curve {
-  p256,
-  p256k,
-  p384,
-  p521,
-  curve25519,
-}
+enum Curve { p256, p256k, p384, p521, curve25519, x25519 }
 
 extension CurveName on Curve {
   String get name {
@@ -160,6 +163,8 @@ extension CurveName on Curve {
         return 'P-521';
       case Curve.curve25519:
         return 'Ed25519';
+      case Curve.x25519:
+        return 'X25519';
     }
   }
 
@@ -174,6 +179,8 @@ extension CurveName on Curve {
       case Curve.p521:
         return 521;
       case Curve.curve25519:
+        return 256;
+      case Curve.x25519:
         return 256;
     }
   }
